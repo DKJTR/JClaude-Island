@@ -22,93 +22,97 @@ struct NotchMenuView: View {
     @State private var launchAtLogin: Bool = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            // Back button
-            MenuRow(
-                icon: "chevron.left",
-                label: "Back"
-            ) {
-                viewModel.toggleMenu()
-            }
+        // ScrollView so the menu gracefully scrolls when content exceeds the
+        // panel height (e.g. both picker rows expanded on a small panel).
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 4) {
+                // Back button
+                MenuRow(
+                    icon: "chevron.left",
+                    label: "Back"
+                ) {
+                    viewModel.toggleMenu()
+                }
 
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.vertical, 4)
 
-            // Appearance settings
-            ScreenPickerRow(screenSelector: screenSelector)
-            SoundPickerRow(soundSelector: soundSelector)
-            ClaudeDirPickerRow()
+                // Appearance settings
+                ScreenPickerRow(screenSelector: screenSelector)
+                SoundPickerRow(soundSelector: soundSelector)
+                ClaudeDirPickerRow()
 
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.vertical, 4)
 
-            // System settings
-            MenuToggleRow(
-                icon: "power",
-                label: "Launch at Login",
-                isOn: launchAtLogin
-            ) {
-                do {
-                    if launchAtLogin {
-                        try SMAppService.mainApp.unregister()
-                        launchAtLogin = false
-                    } else {
-                        try SMAppService.mainApp.register()
-                        launchAtLogin = true
+                // System settings
+                MenuToggleRow(
+                    icon: "power",
+                    label: "Launch at Login",
+                    isOn: launchAtLogin
+                ) {
+                    do {
+                        if launchAtLogin {
+                            try SMAppService.mainApp.unregister()
+                            launchAtLogin = false
+                        } else {
+                            try SMAppService.mainApp.register()
+                            launchAtLogin = true
+                        }
+                    } catch {
+                        print("Failed to toggle launch at login: \(error)")
                     }
-                } catch {
-                    print("Failed to toggle launch at login: \(error)")
+                }
+
+                MenuToggleRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    label: "Hooks",
+                    isOn: hooksInstalled
+                ) {
+                    if hooksInstalled {
+                        HookInstaller.uninstall()
+                        hooksInstalled = false
+                    } else {
+                        HookInstaller.installIfNeeded()
+                        hooksInstalled = true
+                    }
+                }
+
+                AccessibilityRow(isEnabled: AXIsProcessTrusted())
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.vertical, 4)
+
+                // About
+                UpdateRow(updateManager: updateManager)
+
+                MenuRow(
+                    icon: "star",
+                    label: "Star on GitHub"
+                ) {
+                    if let url = URL(string: "https://github.com/farouqaldori/claude-island") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.vertical, 4)
+
+                MenuRow(
+                    icon: "xmark.circle",
+                    label: "Quit",
+                    isDestructive: true
+                ) {
+                    NSApplication.shared.terminate(nil)
                 }
             }
-
-            MenuToggleRow(
-                icon: "arrow.triangle.2.circlepath",
-                label: "Hooks",
-                isOn: hooksInstalled
-            ) {
-                if hooksInstalled {
-                    HookInstaller.uninstall()
-                    hooksInstalled = false
-                } else {
-                    HookInstaller.installIfNeeded()
-                    hooksInstalled = true
-                }
-            }
-
-            AccessibilityRow(isEnabled: AXIsProcessTrusted())
-
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
-
-            // About
-            UpdateRow(updateManager: updateManager)
-
-            MenuRow(
-                icon: "star",
-                label: "Star on GitHub"
-            ) {
-                if let url = URL(string: "https://github.com/farouqaldori/claude-island") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
-
-            MenuRow(
-                icon: "xmark.circle",
-                label: "Quit",
-                isDestructive: true
-            ) {
-                NSApplication.shared.terminate(nil)
-            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
             refreshStates()
