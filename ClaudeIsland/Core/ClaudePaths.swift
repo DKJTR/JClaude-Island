@@ -62,11 +62,11 @@ enum ClaudePaths {
         claudeDir.appendingPathComponent("projects")
     }
 
-    /// Shell-expanded path for hook commands in settings.json.
-    /// Uses "~/" so Claude Code resolves it relative to the user's home.
+    /// Shell-safe absolute path for hook commands in settings.json.
+    /// Absolute paths keep custom directories and ~/.config/claude working;
+    /// quoting keeps paths with spaces from being split by the shell.
     static var hookScriptShellPath: String {
-        let dirName = claudeDir.lastPathComponent
-        return "~/\(dirName)/hooks/claude-island-state.py"
+        shellQuote(claudeDir.appendingPathComponent("hooks/claude-island-state.py").path)
     }
 
     /// Invalidate the cached directory so the next access re-resolves.
@@ -109,5 +109,9 @@ enum ClaudePaths {
 
         // 4. Legacy fallback
         return home.appendingPathComponent(".claude")
+    }
+
+    private static func shellQuote(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

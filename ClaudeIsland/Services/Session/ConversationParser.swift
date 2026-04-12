@@ -657,12 +657,12 @@ actor ConversationParser {
         isError: Bool
     ) -> ToolResultData {
         if toolName.hasPrefix("mcp__") {
-            let parts = toolName.dropFirst(5).split(separator: "_", maxSplits: 2)
-            let serverName = parts.count > 0 ? String(parts[0]) : "unknown"
-            let mcpToolName = parts.count > 1 ? String(parts[1].dropFirst()) : toolName
+            let parts = String(toolName.dropFirst(5)).components(separatedBy: "__")
+            let serverName = parts.first.flatMap { $0.isEmpty ? nil : $0 } ?? "unknown"
+            let mcpToolName = parts.dropFirst().joined(separator: "__")
             return .mcp(MCPResult(
                 serverName: serverName,
-                toolName: mcpToolName,
+                toolName: mcpToolName.isEmpty ? toolName : mcpToolName,
                 rawResult: toolUseResult
             ))
         }
@@ -1131,4 +1131,3 @@ extension ConversationParser {
         return tools
     }
 }
-

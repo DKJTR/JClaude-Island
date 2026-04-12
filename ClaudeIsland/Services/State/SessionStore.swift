@@ -1070,19 +1070,23 @@ actor SessionStore {
 
     /// Recheck status of all active sessions
     private func recheckAllSessions() {
-        for (sessionId, session) in sessions {
-            guard session.phase != .ended else { continue }
+        var removedSession = false
+
+        for (sessionId, session) in Array(sessions) {
+            if session.phase == .ended {
+                sessions.removeValue(forKey: sessionId)
+                cancelPendingSync(sessionId: sessionId)
+                removedSession = true
+                continue
+            }
 
             if let pid = session.pid {
                 let isRunning = isProcessRunning(pid: pid)
                 if !isRunning {
                     Self.logger.info("Process \(pid) no longer running, ending session \(sessionId.prefix(8))")
-                    var updatedSession = session
-                    if updatedSession.phase.canTransition(to: .ended) {
-                        updatedSession.phase = .ended
-                        sessions[sessionId] = updatedSession
-                        publishState()
-                    }
+                    sessions.removeValue(forKey: sessionId)
+                    cancelPendingSync(sessionId: sessionId)
+                    removedSession = true
                     continue
                 }
             }
@@ -1097,6 +1101,10 @@ actor SessionStore {
             if needsSync {
                 scheduleFileSync(sessionId: sessionId, cwd: session.cwd)
             }
+        }
+
+        if removedSession {
+            publishState()
         }
     }
 

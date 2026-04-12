@@ -79,23 +79,9 @@ struct HookInstaller {
         ]
 
         for (event, config) in hookEvents {
-            if var existingEvent = hooks[event] as? [[String: Any]] {
-                let hasOurHook = existingEvent.contains { entry in
-                    if let entryHooks = entry["hooks"] as? [[String: Any]] {
-                        return entryHooks.contains { h in
-                            let cmd = h["command"] as? String ?? ""
-                            return cmd.contains("claude-island-state.py")
-                        }
-                    }
-                    return false
-                }
-                if !hasOurHook {
-                    existingEvent.append(contentsOf: config)
-                    hooks[event] = existingEvent
-                }
-            } else {
-                hooks[event] = config
-            }
+            let existingEvent = hooks[event] as? [[String: Any]] ?? []
+            let cleanedEvent = existingEvent.compactMap { removingClaudeIslandHooks(from: $0) }
+            hooks[event] = cleanedEvent + config
         }
 
         json["hooks"] = hooks
@@ -151,15 +137,7 @@ struct HookInstaller {
 
         for (event, value) in hooks {
             if var entries = value as? [[String: Any]] {
-                entries.removeAll { entry in
-                    if let entryHooks = entry["hooks"] as? [[String: Any]] {
-                        return entryHooks.contains { hook in
-                            let cmd = hook["command"] as? String ?? ""
-                            return cmd.contains("claude-island-state.py")
-                        }
-                    }
-                    return false
-                }
+                entries = entries.compactMap { removingClaudeIslandHooks(from: $0) }
 
                 if entries.isEmpty {
                     hooks.removeValue(forKey: event)
@@ -199,5 +177,23 @@ struct HookInstaller {
         } catch {}
 
         return "python"
+    }
+
+    nonisolated private static func removingClaudeIslandHooks(from entry: [String: Any]) -> [String: Any]? {
+        guard var entryHooks = entry["hooks"] as? [[String: Any]] else {
+            return entry
+        }
+
+        entryHooks.removeAll(where: isClaudeIslandHook)
+        guard !entryHooks.isEmpty else { return nil }
+
+        var updatedEntry = entry
+        updatedEntry["hooks"] = entryHooks
+        return updatedEntry
+    }
+
+    nonisolated private static func isClaudeIslandHook(_ hook: [String: Any]) -> Bool {
+        let cmd = hook["command"] as? String ?? ""
+        return cmd.contains("claude-island-state.py")
     }
 }
