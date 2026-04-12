@@ -513,10 +513,26 @@ actor ConversationParser {
         return ClaudePaths.projectsDir.path + "/" + projectDir + "/" + sessionId + ".jsonl"
     }
 
-    /// Build subagent JSONL file path. Claude Code nests subagent JSONL files
-    /// under the parent session directory: projects/<project>/<sessionId>/subagents/agent-<agentId>.jsonl
+    /// Build subagent JSONL file path.
+    ///
+    /// Current Claude Code nests subagent files under the parent session:
+    ///   projects/<project>/<sessionId>/subagents/agent-<agentId>.jsonl
+    ///
+    /// Older Claude Code versions stored them flat:
+    ///   projects/<project>/agent-<agentId>.jsonl
+    ///
+    /// Prefer the nested path; fall back to the flat path if only it exists
+    /// (cross-version compatibility). If neither exists yet (file still being
+    /// created) we return the nested path as the modern default.
     nonisolated static func subagentFilePath(sessionId: String, agentId: String, projectDir: String) -> String {
-        return ClaudePaths.projectsDir.path + "/" + projectDir + "/" + sessionId + "/subagents/agent-" + agentId + ".jsonl"
+        let base = ClaudePaths.projectsDir.path + "/" + projectDir
+        let nested = base + "/" + sessionId + "/subagents/agent-" + agentId + ".jsonl"
+        let flat = base + "/agent-" + agentId + ".jsonl"
+
+        let fm = FileManager.default
+        if fm.fileExists(atPath: nested) { return nested }
+        if fm.fileExists(atPath: flat) { return flat }
+        return nested
     }
 
     private func parseMessageLine(_ json: [String: Any], seenToolIds: inout Set<String>, toolIdToName: inout [String: String]) -> ChatMessage? {
