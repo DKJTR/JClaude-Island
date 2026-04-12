@@ -50,6 +50,7 @@ class NotchViewModel: ObservableObject {
 
     private let screenSelector = ScreenSelector.shared
     private let soundSelector = SoundSelector.shared
+    private let claudeDirSelector = ClaudeDirSelector.shared
 
     // MARK: - Geometry
 
@@ -76,7 +77,10 @@ class NotchViewModel: ObservableObject {
             // Picker expansion deltas added on top when expanded.
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
-                height: 540 + screenSelector.expandedPickerHeight + soundSelector.expandedPickerHeight
+                height: 540
+                    + screenSelector.expandedPickerHeight
+                    + soundSelector.expandedPickerHeight
+                    + claudeDirSelector.expandedPickerHeight
             )
         case .instances:
             return CGSize(
@@ -117,6 +121,10 @@ class NotchViewModel: ObservableObject {
             .store(in: &cancellables)
 
         soundSelector.$isPickerExpanded
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        claudeDirSelector.$isPickerExpanded
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }

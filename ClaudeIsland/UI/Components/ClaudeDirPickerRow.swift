@@ -12,16 +12,18 @@ import AppKit
 import SwiftUI
 
 struct ClaudeDirPickerRow: View {
+    @ObservedObject private var selector = ClaudeDirSelector.shared
     @State private var currentValue: String = AppSettings.claudeDirectoryName
-    @State private var isExpanded: Bool = false
     @State private var isHovered: Bool = false
+
+    private var isExpanded: Bool { selector.isPickerExpanded }
 
     var body: some View {
         VStack(spacing: 0) {
             // Main row - shows current selection
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
+                    selector.isPickerExpanded.toggle()
                 }
             } label: {
                 HStack(spacing: 10) {
