@@ -103,11 +103,22 @@ struct ClaudeDirPickerRow: View {
         panel.canCreateDirectories = false
         panel.directoryURL = ClaudePaths.claudeDir
 
-        // The notch panel sits at a very high window level (mainMenu + 3).
-        // Lift this picker above it so it doesn't get covered.
+        // Lift the picker above the notch's window level (mainMenu + 3)
         panel.level = .popUpMenu
 
-        if panel.runModal() == .OK, let url = panel.url {
+        // The notch window catches clicks over its whole frame when open, which
+        // blocks interaction with anything below (even a higher-level window,
+        // because hit-testing on the notch consumes the event). Let clicks pass
+        // through the notch while the picker is modal, then restore.
+        let notchWindow = NSApp.windows.first { $0 is NotchPanel }
+        let wasIgnoring = notchWindow?.ignoresMouseEvents ?? true
+        notchWindow?.ignoresMouseEvents = true
+
+        let response = panel.runModal()
+
+        notchWindow?.ignoresMouseEvents = wasIgnoring
+
+        if response == .OK, let url = panel.url {
             applyChoice(path: url.path)
         }
     }
