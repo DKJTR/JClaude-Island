@@ -27,12 +27,16 @@ enum NotchContentType: Equatable {
     case instances
     case menu
     case chat(SessionState)
+    case media
+    case bluetooth
 
     var id: String {
         switch self {
         case .instances: return "instances"
         case .menu: return "menu"
         case .chat(let session): return "chat-\(session.sessionId)"
+        case .media: return "media"
+        case .bluetooth: return "bluetooth"
         }
     }
 }
@@ -83,9 +87,21 @@ class NotchViewModel: ObservableObject {
                     + claudeDirSelector.expandedPickerHeight
             )
         case .instances:
+            // Extra height when media is playing (stacked layout)
+            let mediaExtra: CGFloat = MediaRemoteService.shared.isActive ? 70 : 0
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
+                height: 320 + mediaExtra
+            )
+        case .media:
+            return CGSize(
+                width: min(screenRect.width * 0.45, 520),
                 height: 320
+            )
+        case .bluetooth:
+            return CGSize(
+                width: min(screenRect.width * 0.4, 480),
+                height: 300
             )
         }
     }

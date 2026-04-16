@@ -171,19 +171,10 @@ struct InstanceRow: View {
 
             // Text content
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(session.displayTitle)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-
-                    // Token usage indicator
-                    if session.usage.totalTokens > 0 {
-                        Text(session.usage.formattedTotal)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.3))
-                    }
-                }
+                Text(session.displayTitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
                 // Show tool call when waiting for approval, otherwise last activity
                 if isWaitingForApproval, let toolName = session.pendingToolName {
@@ -285,7 +276,18 @@ struct InstanceRow: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
             } else {
                 HStack(spacing: 8) {
-                    // Chat icon - always show
+                    // Token usage bar
+                    if session.usage.totalTokens > 0 {
+                        TokenUsageBar(
+                            inputTokens: session.usage.inputTokens,
+                            outputTokens: session.usage.outputTokens,
+                            cacheReadTokens: session.usage.cacheReadTokens,
+                            cacheCreationTokens: session.usage.cacheCreationTokens,
+                            contextLimit: TokenUsageBar.inferLimit(totalTokens: session.usage.totalTokens)
+                        )
+                    }
+
+                    // Chat icon
                     IconButton(icon: "bubble.left") {
                         onChat()
                     }

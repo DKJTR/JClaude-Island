@@ -9,7 +9,7 @@ import os
 import socket
 import sys
 
-SOCKET_PATH = "/tmp/claude-island.sock"
+SOCKET_PATH = "/tmp/dynamic-island.sock"
 TIMEOUT_SECONDS = 300  # 5 minutes for permission decisions
 
 

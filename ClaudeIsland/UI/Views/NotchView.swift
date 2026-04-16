@@ -19,6 +19,8 @@ struct NotchView: View {
     @ObservedObject var viewModel: NotchViewModel
     @StateObject private var sessionMonitor = ClaudeSessionMonitor()
     @StateObject private var activityCoordinator = NotchActivityCoordinator.shared
+    @ObservedObject private var mediaService = MediaRemoteService.shared
+    @ObservedObject private var bluetoothService = BluetoothService.shared
     @ObservedObject private var updateManager = UpdateManager.shared
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
@@ -26,6 +28,7 @@ struct NotchView: View {
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
+    @State private var modeScale: CGFloat = 1.0
 
     @Namespace private var activityNamespace
 
@@ -63,33 +66,50 @@ struct NotchView: View {
         )
     }
 
-    /// Extra width for expanding activities (like Dynamic Island)
+    /// Whether Claude is actively working (not just the 30s cooldown)
+    private var hasClaudeActivity: Bool {
+        isAnyProcessing || hasPendingPermission
+    }
+
+    /// Whether Claude has any visible state (including 30s "done" checkmark)
+    private var hasClaudeVisibleState: Bool {
+        isAnyProcessing || hasPendingPermission || hasWaitingForInput
+    }
+
+    /// Whether media is playing
+    private var hasMediaActivity: Bool {
+        mediaService.isActive && (mediaService.nowPlaying?.hasContent ?? false)
+    }
+
+    /// Closed notch expansion: show Claude if actively working, else show media
     private var expansionWidth: CGFloat {
-        // Permission indicator adds width on left side only
         let permissionIndicatorWidth: CGFloat = hasPendingPermission ? 18 : 0
+        let baseWidth = 2 * max(0, closedNotchSize.height - 12) + 20
 
-        // Expand for processing activity
-        if activityCoordinator.expandingActivity.show {
-            switch activityCoordinator.expandingActivity.type {
-            case .claude:
-                let baseWidth = 2 * max(0, closedNotchSize.height - 12) + 20
-                return baseWidth + permissionIndicatorWidth
-            case .none:
-                break
-            }
+        // Claude takes priority only when actively working
+        if closedShowsClaude {
+            return baseWidth + permissionIndicatorWidth
         }
-
-        // Expand for pending permissions (left indicator) or waiting for input (checkmark on right)
-        if hasPendingPermission {
-            return 2 * max(0, closedNotchSize.height - 12) + 20 + permissionIndicatorWidth
+        // Music-only: left wing (album+song) + right wing (sound bars)
+        if hasMediaActivity {
+            let leftWing = max(0, closedNotchSize.height - 12) + 10 + 80
+            let rightWing = max(0, closedNotchSize.height - 12) + 10
+            return leftWing + rightWing
         }
-
-        // Waiting for input just shows checkmark on right, no extra left indicator
-        if hasWaitingForInput {
-            return 2 * max(0, closedNotchSize.height - 12) + 20
-        }
-
         return 0
+    }
+
+    /// Whether closed state shows Claude (true) or media (false)
+    /// Claude takes over only when actively processing/approval, not during the done-checkmark cooldown
+    private var closedShowsClaude: Bool {
+        isAnyProcessing || hasPendingPermission
+    }
+
+    /// Glow color for hover: green when media is active, orange/prompt when Claude is active, dim white otherwise
+    private var hoverGlowColor: Color {
+        if hasMediaActivity { return TerminalColors.green }
+        if closedShowsClaude { return TerminalColors.prompt }
+        return Color.white
     }
 
     private var notchSize: CGSize {
@@ -149,7 +169,16 @@ struct NotchView: View {
                             : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], viewModel.status == .opened ? 12 : 0)
-                    .background(.black)
+                    .background {
+                        if viewModel.status == .opened {
+                            ZStack {
+                                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                                Color.black.opacity(0.82)
+                            }
+                        } else {
+                            Color.black
+                        }
+                    }
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -161,6 +190,12 @@ struct NotchView: View {
                         color: (viewModel.status == .opened || isHovering) ? .black.opacity(0.7) : .clear,
                         radius: 6
                     )
+                    .shadow(
+                        color: isHovering && viewModel.status != .opened
+                            ? hoverGlowColor.opacity(0.35)
+                            : .clear,
+                        radius: 12
+                    )
                     .frame(
                         maxWidth: viewModel.status == .opened ? notchSize.width : nil,
                         maxHeight: viewModel.status == .opened ? notchSize.height : nil,
@@ -168,10 +203,12 @@ struct NotchView: View {
                     )
                     .animation(viewModel.status == .opened ? openAnimation : closeAnimation, value: viewModel.status)
                     .animation(openAnimation, value: notchSize) // Animate container size changes between content types
-                    .animation(.smooth, value: activityCoordinator.expandingActivity)
+                    .animation(.smooth, value: expansionWidth)
                     .animation(.smooth, value: hasPendingPermission)
                     .animation(.smooth, value: hasWaitingForInput)
+                    .animation(.smooth, value: hasMediaActivity)
                     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isBouncing)
+                    .scaleEffect(modeScale, anchor: .top)
                     .contentShape(Rectangle())
                     .onHover { hovering in
                         withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
@@ -205,17 +242,32 @@ struct NotchView: View {
             handleProcessingChange()
             handleWaitingForInputChange(instances)
         }
+        .onChange(of: mediaService.isActive) { _, _ in
+            handleProcessingChange()
+        }
+        .onChange(of: closedShowsClaude) { _, _ in
+            guard viewModel.status == .closed else { return }
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                modeScale = 1.03
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.65)) {
+                    modeScale = 1.0
+                }
+            }
+        }
+        .animation(.smooth, value: mediaService.isActive)
     }
 
     // MARK: - Notch Layout
 
     private var isProcessing: Bool {
-        activityCoordinator.expandingActivity.show && activityCoordinator.expandingActivity.type == .claude
+        isAnyProcessing || hasPendingPermission
     }
 
-    /// Whether to show the expanded closed state (processing, pending permission, or waiting for input)
+    /// Whether to show the expanded closed state
     private var showClosedActivity: Bool {
-        isProcessing || hasPendingPermission || hasWaitingForInput
+        closedShowsClaude || hasMediaActivity
     }
 
     @ViewBuilder
@@ -246,52 +298,70 @@ struct NotchView: View {
     @ViewBuilder
     private var headerRow: some View {
         HStack(spacing: 0) {
-            // Left side - crab + optional permission indicator (visible when processing, pending, or waiting for input)
-            if showClosedActivity {
-                HStack(spacing: 4) {
-                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                        .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
+            if viewModel.status == .opened {
+                // OPENED: crab + header content + spinner
+                if hasClaudeVisibleState {
+                    HStack(spacing: 4) {
+                        ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
+                        if hasPendingPermission {
+                            PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
+                        }
+                    }
+                    .padding(.leading, 8)
+                }
 
-                    // Permission indicator only (amber) - waiting for input shows checkmark on right
-                    if hasPendingPermission {
-                        PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
-                            .matchedGeometryEffect(id: "status-indicator", in: activityNamespace, isSource: showClosedActivity)
+                openedHeaderContent
+
+                if hasClaudeVisibleState {
+                    if isProcessing || hasPendingPermission {
+                        ProcessingSpinner()
+                            .frame(width: 20)
+                    } else if hasWaitingForInput {
+                        ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
+                            .frame(width: 20)
                     }
                 }
-                .frame(width: viewModel.status == .opened ? nil : sideWidth + (hasPendingPermission ? 18 : 0))
-                .padding(.leading, viewModel.status == .opened ? 8 : 0)
-            }
+            } else if closedShowsClaude {
+                // CLOSED — Claude mode: crab left, spinner right
+                HStack(spacing: 4) {
+                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
+                    if hasPendingPermission {
+                        PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
+                    }
+                }
+                .frame(width: sideWidth + (hasPendingPermission ? 18 : 0))
 
-            // Center content
-            if viewModel.status == .opened {
-                // Opened: show header content
-                openedHeaderContent
-            } else if !showClosedActivity {
-                // Closed without activity: empty space
-                Rectangle()
-                    .fill(.clear)
-                    .frame(width: closedNotchSize.width - 20)
-            } else {
-                // Closed with activity: black spacer (with optional bounce)
                 Rectangle()
                     .fill(.black)
                     .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top + (isBouncing ? 16 : 0))
-            }
 
-            // Right side - spinner when processing/pending, checkmark when waiting for input
-            if showClosedActivity {
                 if isProcessing || hasPendingPermission {
                     ProcessingSpinner()
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                        .padding(.trailing, viewModel.status == .opened ? 0 : 4)
+                        .frame(width: sideWidth)
+                        .padding(.trailing, 4)
                 } else if hasWaitingForInput {
-                    // Checkmark for waiting-for-input on the right side
                     ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                        .padding(.trailing, viewModel.status == .opened ? 0 : 4)
+                        .frame(width: sideWidth)
+                        .padding(.trailing, 4)
                 }
+            } else if hasMediaActivity {
+                // CLOSED — Media-only: wings only (progress bar is in expanded view)
+                HStack(spacing: 0) {
+                    MediaClosedLeftWing(mediaService: mediaService)
+                        .frame(width: sideWidth + 80)
+
+                    Rectangle()
+                        .fill(.black)
+                        .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top)
+
+                    MediaClosedRightWing(mediaService: mediaService)
+                        .frame(width: sideWidth)
+                }
+            } else {
+                // CLOSED — nothing active
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: closedNotchSize.width - 20)
             }
         }
         .frame(height: closedNotchSize.height)
@@ -305,12 +375,9 @@ struct NotchView: View {
 
     @ViewBuilder
     private var openedHeaderContent: some View {
-        HStack(spacing: 12) {
-            // Show static crab only if not showing activity in headerRow
-            // (headerRow handles crab + indicator when showClosedActivity is true)
-            if !showClosedActivity {
+        HStack(spacing: 8) {
+            if !hasClaudeActivity {
                 ClaudeCrabIcon(size: 14)
-                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: !showClosedActivity)
                     .padding(.leading, 8)
             }
 
@@ -332,7 +399,6 @@ struct NotchView: View {
                         .frame(width: 22, height: 22)
                         .contentShape(Rectangle())
 
-                    // Green dot for unseen update
                     if updateManager.hasUnseenUpdate && viewModel.contentType != .menu {
                         Circle()
                             .fill(TerminalColors.green)
@@ -351,11 +417,6 @@ struct NotchView: View {
     private var contentView: some View {
         Group {
             switch viewModel.contentType {
-            case .instances:
-                ClaudeInstancesView(
-                    sessionMonitor: sessionMonitor,
-                    viewModel: viewModel
-                )
             case .menu:
                 NotchMenuView(viewModel: viewModel)
             case .chat(let session):
@@ -365,38 +426,58 @@ struct NotchView: View {
                     sessionMonitor: sessionMonitor,
                     viewModel: viewModel
                 )
-                // Force a fresh ChatView when switching sessions — otherwise
-                // @State (history, session, scroll position) leaks from the
-                // previous session and the view shows the wrong conversation.
-                // Keyed on sessionId only (not the whole SessionState) so
-                // per-event updates still reuse the view.
                 .id(session.sessionId)
+            default:
+                // Stacked layout: Claude on top (if sessions), Media below (if playing)
+                VStack(spacing: 0) {
+                    // Claude section (only if sessions exist)
+                    if !sessionMonitor.instances.isEmpty {
+                        ClaudeInstancesView(
+                            sessionMonitor: sessionMonitor,
+                            viewModel: viewModel
+                        )
+                    }
+
+                    // Media section (if music is playing)
+                    if hasMediaActivity {
+                        if !sessionMonitor.instances.isEmpty {
+                            Divider()
+                                .background(Color.white.opacity(0.08))
+                                .padding(.vertical, 4)
+                        }
+
+                        CompactMediaRow(mediaService: mediaService)
+                    }
+
+                    // Nothing active
+                    if sessionMonitor.instances.isEmpty && !hasMediaActivity {
+                        VStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 20, weight: .light))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text("No active sessions")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    }
+                }
             }
         }
-        .frame(width: notchSize.width - 24) // Fixed width to prevent text reflow
+        .frame(width: notchSize.width - 24)
     }
 
     // MARK: - Event Handlers
 
     private func handleProcessingChange() {
-        if isAnyProcessing || hasPendingPermission {
-            // Show claude activity when processing or waiting for permission
-            activityCoordinator.showActivity(type: .claude)
-            isVisible = true
-        } else if hasWaitingForInput {
-            // Keep visible for waiting-for-input but hide the processing spinner
-            activityCoordinator.hideActivity()
+        if closedShowsClaude || hasMediaActivity {
             isVisible = true
         } else {
-            // Hide activity when done
-            activityCoordinator.hideActivity()
-
-            // Delay hiding the notch until animation completes
-            // Don't hide on non-notched devices - users need a visible target
             if viewModel.status == .closed && viewModel.hasPhysicalNotch {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if !isAnyProcessing && !hasPendingPermission && !hasWaitingForInput && viewModel.status == .closed {
-                        isVisible = false
+                    if !self.closedShowsClaude && !self.hasMediaActivity && self.viewModel.status == .closed {
+                        self.isVisible = false
                     }
                 }
             }
@@ -412,10 +493,9 @@ struct NotchView: View {
                 waitingForInputTimestamps.removeAll()
             }
         case .closed:
-            // Don't hide on non-notched devices - users need a visible target
             guard viewModel.hasPhysicalNotch else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                if viewModel.status == .closed && !isAnyProcessing && !hasPendingPermission && !hasWaitingForInput && !activityCoordinator.expandingActivity.show {
+                if viewModel.status == .closed && !closedShowsClaude && !hasMediaActivity {
                     isVisible = false
                 }
             }
@@ -506,5 +586,25 @@ struct NotchView: View {
         }
 
         return false
+    }
+}
+
+// MARK: - NSVisualEffectView wrapper for blur behind the notch
+
+struct VisualEffectView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    let blendingMode: NSVisualEffectView.BlendingMode
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = blendingMode
     }
 }

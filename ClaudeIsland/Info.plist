@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Claude Island</string>
+    <string>DynamicIsland</string>
     <key>CFBundleDisplayName</key>
-    <string>Claude Island</string>
+    <string>DynamicIsland</string>
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleVersion</key>
@@ -17,12 +17,13 @@
     <key>NSHumanReadableCopyright</key>
     <string>Copyright 2025. All rights reserved.</string>
 
-    <!-- Sparkle Update Configuration -->
-    <key>SUFeedURL</key>
-    <string>https://claudeisland.com/appcast.xml</string>
-    <key>SUPublicEDKey</key>
-    <string>w5NwH5KRfE7LfeZ09J8lWx3UQrWTqUbfH4HHBa1OPRk=</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>DynamicIsland shows your connected Bluetooth devices and battery levels.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>DynamicIsland controls media playback in Spotify and Apple Music.</string>
+
+    <!-- Sparkle Update Configuration (disabled for personal build) -->
     <key>SUEnableAutomaticChecks</key>
-    <true/>
+    <false/>
 </dict>
 </plist>

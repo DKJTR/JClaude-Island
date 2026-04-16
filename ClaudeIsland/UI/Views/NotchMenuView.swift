@@ -20,6 +20,8 @@ struct NotchMenuView: View {
     @ObservedObject private var soundSelector = SoundSelector.shared
     @State private var hooksInstalled: Bool = false
     @State private var launchAtLogin: Bool = false
+    @State private var showNowPlaying: Bool = AppSettings.showNowPlaying
+    @State private var showBluetooth: Bool = AppSettings.showBluetooth
 
     var body: some View {
         // ScrollView so the menu gracefully scrolls when content exceeds the
@@ -81,6 +83,29 @@ struct NotchMenuView: View {
                 }
 
                 AccessibilityRow(isEnabled: AXIsProcessTrusted())
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.vertical, 4)
+
+                // Media & Bluetooth
+                MenuToggleRow(
+                    icon: "music.note",
+                    label: "Now Playing",
+                    isOn: showNowPlaying
+                ) {
+                    showNowPlaying.toggle()
+                    AppSettings.showNowPlaying = showNowPlaying
+                }
+
+                MenuToggleRow(
+                    icon: "wave.3.right",
+                    label: "Bluetooth Devices",
+                    isOn: showBluetooth
+                ) {
+                    showBluetooth.toggle()
+                    AppSettings.showBluetooth = showBluetooth
+                }
 
                 Divider()
                     .background(Color.white.opacity(0.08))

@@ -39,6 +39,8 @@ enum AppSettings {
     private enum Keys {
         static let notificationSound = "notificationSound"
         static let claudeDirectoryName = "claudeDirectoryName"
+        static let showNowPlaying = "showNowPlaying"
+        static let showBluetooth = "showBluetooth"
     }
 
     // MARK: - Notification Sound
@@ -55,6 +57,20 @@ enum AppSettings {
         set {
             defaults.set(newValue.rawValue, forKey: Keys.notificationSound)
         }
+    }
+
+    // MARK: - Media & Bluetooth
+
+    /// Whether to show Now Playing info in the notch
+    static var showNowPlaying: Bool {
+        get { defaults.object(forKey: Keys.showNowPlaying) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.showNowPlaying) }
+    }
+
+    /// Whether to show Bluetooth devices in the notch
+    static var showBluetooth: Bool {
+        get { defaults.object(forKey: Keys.showBluetooth) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.showBluetooth) }
     }
 
     // MARK: - Claude Directory

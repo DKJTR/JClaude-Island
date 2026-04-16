@@ -10,7 +10,7 @@ import Foundation
 import os.log
 
 /// Logger for hook socket server
-private let logger = Logger(subsystem: "com.claudeisland", category: "Hooks")
+private let logger = Logger(subsystem: "com.jack.DynamicIsland", category: "Hooks")
 
 /// Event received from Claude Code hooks
 struct HookEvent: Codable, Sendable {
@@ -107,7 +107,7 @@ typealias PermissionFailureHandler = @Sendable (_ sessionId: String, _ toolUseId
 /// Uses GCD DispatchSource for non-blocking I/O
 class HookSocketServer {
     static let shared = HookSocketServer()
-    static let socketPath = "/tmp/claude-island.sock"
+    static let socketPath = "/tmp/dynamic-island.sock"
 
     private var serverSocket: Int32 = -1
     private var acceptSource: DispatchSourceRead?
