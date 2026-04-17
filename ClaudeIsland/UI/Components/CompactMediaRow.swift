@@ -15,22 +15,29 @@ struct CompactMediaRow: View {
         if let nowPlaying = mediaService.nowPlaying, nowPlaying.hasContent {
             VStack(spacing: 6) {
                 HStack(spacing: 10) {
-                    // Album art
-                    albumArt(nowPlaying)
-                        .frame(width: 36, height: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    // Album art + track info (click to open app)
+                    Button {
+                        openMusicApp(bundleId: nowPlaying.bundleIdentifier)
+                    } label: {
+                        HStack(spacing: 10) {
+                            albumArt(nowPlaying)
+                                .frame(width: 36, height: 36)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                    // Track info
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(nowPlaying.title)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        Text(nowPlaying.artist)
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.5))
-                            .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(nowPlaying.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text(nowPlaying.artist)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
 
                     Spacer()
 
@@ -90,6 +97,12 @@ struct CompactMediaRow: View {
             .padding(.vertical, 6)
             .background(Color.white.opacity(0.04))
             .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func openMusicApp(bundleId: String) {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            NSWorkspace.shared.openApplication(at: url, configuration: .init())
         }
     }
 

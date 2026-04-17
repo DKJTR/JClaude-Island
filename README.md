@@ -1,60 +1,59 @@
 <div align="center">
   <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="JClaude Island" width="80" height="80">
   <h1>JClaude Island</h1>
-  <p><strong>One notch to rule them all.</strong></p>
-  <p>Claude Code + Spotify + Apple Music + Bluetooth in a single macOS Dynamic Island.</p>
+  <p><strong>Your AI copilot and music, together in the notch.</strong></p>
   <br />
   <img src="hero-banner.png" alt="Hero" width="600">
 </div>
 
 ---
 
-Stop juggling [Claude Island](https://github.com/farouqaldori/claude-island), [Alcove](https://tryalcove.com/), and [Vibe Island](https://vibeisland.app/). JClaude Island merges AI agent monitoring with media controls and device tracking into one notch app that gets out of your way.
+JClaude Island is a macOS notch app that brings Claude Code sessions, music playback, and Bluetooth device info into one place. Built on top of the excellent [Claude Island](https://github.com/farouqaldori/claude-island), with additional media and device integrations.
 
 <div align="center">
-  <img src="feature-showcase.png" alt="Feature Showcase" width="800">
+  <img src="feature-showcase.png" alt="Features" width="700">
 </div>
 
-## How It Works
+## What It Does
 
-**Closed notch** adapts to what's happening:
+**Closed notch** adapts to context:
 
 | State | Left Wing | Right Wing |
 |-------|-----------|------------|
 | Claude processing | Crab icon | Orange spinner |
-| Spotify playing | Album art + track | Waveform bars |
+| Music playing (Claude idle) | Album art + track | Waveform animation |
 | Both active | Claude takes priority | Expand to see both |
-| Nothing | Notch hides | |
 
 **Expanded notch** shows everything stacked:
-- Claude session rows with token usage bars and tool approval
-- Spotify/Apple Music compact player with seekable progress bar
-- AskUserQuestion prompts with pickable options
+- Claude session rows with token usage bars
+- Spotify / Apple Music player with seekable progress bar
+- Click on track name to open the music app
+- AskUserQuestion prompts with pickable option buttons
 
 ## Features
 
 **Claude Code**
-- Multi-session monitoring with per-session token usage bars
+- Multi-session monitoring with vertical token usage bars
 - Tool permission approval directly from the notch
-- AskUserQuestion prompts with clickable option buttons
-- Stale session detection (auto-idle after 30s without events)
+- AskUserQuestion prompts with clickable options
+- Stale session detection (auto-idle after 30s)
 - Session titles sync with `/rename`
 
 **Now Playing**
-- Spotify and Apple Music via AppleScript (no private API dependency)
-- Play / pause / next / previous from the notch
+- Spotify and Apple Music support
+- Play / pause / next / previous controls
 - Seekable progress bar with time labels
-- Album art with smooth crossfade on track change
+- Album art crossfade on track change
+- Click track name to open the music app
 
 **Bluetooth**
 - Connected device list with battery levels
 - AirPods Left / Right / Case breakdown
-- Auto-refresh every 30 seconds
 
-**Visual Polish** (inspired by [Alcove](https://tryalcove.com/))
+**Visual Polish**
 - 5-bar organic waveform animation
 - Frosted glass blur behind expanded panel
-- Context-aware hover glow (green for media, orange for Claude)
+- Context-aware hover glow
 - Mode-switch bounce animation
 
 ## Install
@@ -77,38 +76,26 @@ cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Releas
 
 Or open `ClaudeIsland.xcodeproj` in Xcode and hit **Cmd+R**.
 
-Hooks auto-install on first launch. No configuration needed.
+Hooks auto-install on first launch.
 
 ## Architecture
 
 ```
-Claude Code hooks
-    --> Python script (~/.claude/hooks/)
-    --> Unix socket (/tmp/dynamic-island.sock)
-    --> Swift app (NotchView + SessionStore + MediaRemoteService)
-    --> macOS notch overlay (NSPanel, non-activating, click-through)
-
-Spotify / Apple Music
-    --> AppleScript polling (2s interval)
-    --> NSWorkspace process check (never launches apps)
-
-Bluetooth
-    --> IOBluetooth + IOKit (30s polling)
+Claude Code hooks --> Python (~/.claude/hooks/) --> Unix socket --> SwiftUI notch overlay
+Spotify/Apple Music --> AppleScript polling (2s) --> Now Playing state
+Bluetooth --> IOBluetooth + IOKit (30s polling) --> Device list
 ```
 
 ## Known Limitations
 
-- **Chrome / YouTube not supported.** AppleScript can't query Chrome media state. Only Spotify and Apple Music.
-- **Token count is approximate.** Uses JSONL-parsed input/output tokens, not the internal context window percentage from Claude Code.
-- **Ad-hoc signing only.** Uses AppleScript automation, so it can't be distributed via the Mac App Store.
-- **macOS 26 (Tahoe):** MediaRemote private API is blocked for ad-hoc signed apps. JClaude Island uses AppleScript as the primary media backend.
+- Chrome / YouTube not supported (AppleScript limitation)
+- Token count is approximate (JSONL-parsed, not internal context %)
+- Ad-hoc signing only (uses AppleScript automation)
 
-## Credits
+## Acknowledgments
 
-- [Claude Island](https://github.com/farouqaldori/claude-island) by Farouq Aldori -- the foundation this is built on
-- [Alcove](https://tryalcove.com/) -- inspiration for waveform, blur, and polish
-- [Vibe Island](https://vibeisland.app/) -- inspiration for multi-agent notch UX
+Built on [Claude Island](https://github.com/farouqaldori/claude-island) by Farouq Aldori. Learned from [Alcove](https://tryalcove.com/) and [Vibe Island](https://vibeisland.app/) for UX patterns.
 
 ## License
 
-Apache 2.0 (same as upstream Claude Island)
+Apache 2.0
