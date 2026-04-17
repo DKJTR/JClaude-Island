@@ -82,10 +82,11 @@ struct HookEvent: Codable, Sendable {
         }
     }
 
-    /// Whether this event expects a response (permission request OR question answer)
+    /// Whether this event expects a response (permission request)
+    /// AskUserQuestion no longer blocks — it's fire-and-forget so the terminal
+    /// picker still renders; the island mirror submits via TerminalRouter.
     nonisolated var expectsResponse: Bool {
-        (event == "PermissionRequest" && status == "waiting_for_approval")
-        || (event == "PreToolUse" && tool == "AskUserQuestion" && status == "waiting_for_answer")
+        event == "PermissionRequest" && status == "waiting_for_approval"
     }
 }
 
@@ -379,7 +380,50 @@ class HookSocketServer {
         var nosigpipe: Int32 = 1
         setsockopt(clientSocket, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, socklen_t(MemoryLayout<Int32>.size))
 
+        // Per-process auth: only accept connections from a process whose
+        // ancestor chain includes a `claude` binary. Defends against any
+        // same-UID app on the box (a browser extension helper, an Electron
+        // companion, a dev script) speaking the protocol.
+        if let peerPid = peerPid(for: clientSocket), !isLikelyClaudeCode(pid: Int(peerPid)) {
+            logger.warning("Rejecting socket connection from non-Claude pid \(peerPid, privacy: .public)")
+            close(clientSocket)
+            return
+        }
+
         handleClient(clientSocket)
+    }
+
+    /// Read the peer process ID via SOL_LOCAL / LOCAL_PEERPID (macOS-specific).
+    private func peerPid(for socket: Int32) -> pid_t? {
+        var pid: pid_t = 0
+        var len = socklen_t(MemoryLayout<pid_t>.size)
+        let result = withUnsafeMutablePointer(to: &pid) { ptr in
+            getsockopt(socket, SOL_LOCAL, LOCAL_PEERPID, ptr, &len)
+        }
+        return result == 0 ? pid : nil
+    }
+
+    /// Walk the parent process chain looking for a process named/pathed `claude`.
+    /// Returns true if found within 12 hops; false if we hit pid 1 or no claude.
+    private func isLikelyClaudeCode(pid: Int) -> Bool {
+        let tree = ProcessTreeBuilder.shared.buildTree()
+        var current = pid
+        var hops = 0
+        while current > 1, hops < 12 {
+            guard let info = tree[current] else { break }
+            let lower = info.command.lowercased()
+            // Match "claude" command or anything ending in /claude (script wrappers,
+            // node-launched binaries, npm-installed shims).
+            if lower == "claude"
+                || lower.hasSuffix("/claude")
+                || lower.contains("claude-code")
+                || (lower.contains("node") && lower.contains("claude")) {
+                return true
+            }
+            current = info.ppid
+            hops += 1
+        }
+        return false
     }
 
     private func handleClient(_ clientSocket: Int32) {
@@ -421,7 +465,10 @@ class HookSocketServer {
         let data = allData
 
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: data) else {
-            logger.warning("Failed to parse event: \(String(data: data, encoding: .utf8) ?? "?", privacy: .public)")
+            // Don't log payload — it can contain file paths, code, env-like
+            // strings from tool_input. Just record the size so we know the
+            // socket is talking but parsing failed.
+            logger.warning("Failed to parse hook event (\(data.count, privacy: .public) bytes)")
             close(clientSocket)
             return
         }

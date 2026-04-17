@@ -101,11 +101,28 @@ def main():
         state["status"] = "processing"
 
     elif event == "PreToolUse":
-        state["status"] = "running_tool"
-        state["tool"] = data.get("tool_name")
-        state["tool_input"] = tool_input
-        # Send tool_use_id to Swift for caching
+        tool_name = data.get("tool_name")
         tool_use_id_from_event = data.get("tool_use_id")
+
+        # AskUserQuestion → mirror to ClaudeIsland (fire-and-forget).
+        if tool_name == "AskUserQuestion":
+            state["status"] = "waiting_for_answer"
+            state["tool"] = tool_name
+            state["tool_input"] = tool_input
+            if tool_use_id_from_event:
+                state["tool_use_id"] = tool_use_id_from_event
+            try:
+                with open("/tmp/claude-island-hook-debug.log", "a") as _f:
+                    from datetime import datetime
+                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion FIRE: keys={list(tool_input.keys())} q_count={len((tool_input.get('questions') or []))}\n")
+            except Exception:
+                pass
+            send_event(state)  # fire-and-forget — does not block
+            sys.exit(0)
+
+        state["status"] = "running_tool"
+        state["tool"] = tool_name
+        state["tool_input"] = tool_input
         if tool_use_id_from_event:
             state["tool_use_id"] = tool_use_id_from_event
 
@@ -137,9 +154,32 @@ def main():
         state["denial_reason"] = data.get("reason") or data.get("message")
 
     elif event == "PermissionRequest":
+        tool_name = data.get("tool_name")
+
+        # Special case: AskUserQuestion's PermissionRequest also fires.
+        # Auto-approve so the terminal picker renders, but DO NOT send a
+        # waiting_for_approval event to the island (the prior PreToolUse
+        # already mirrored the question with status=waiting_for_answer; this
+        # would otherwise overwrite the phase with .waitingForApproval).
+        if tool_name == "AskUserQuestion":
+            try:
+                with open("/tmp/claude-island-hook-debug.log", "a") as _f:
+                    from datetime import datetime
+                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion PermissionRequest auto-allow\n")
+            except Exception:
+                pass
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PermissionRequest",
+                    "decision": {"behavior": "allow"},
+                }
+            }
+            print(json.dumps(output))
+            sys.exit(0)
+
         # This is where we can control the permission
         state["status"] = "waiting_for_approval"
-        state["tool"] = data.get("tool_name")
+        state["tool"] = tool_name
         state["tool_input"] = tool_input
         # tool_use_id lookup handled by Swift-side cache from PreToolUse
 

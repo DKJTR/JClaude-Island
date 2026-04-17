@@ -103,8 +103,23 @@ actor ConversationParser {
     /// Parse a JSONL file to extract conversation info
     /// Uses caching based on file modification time
     func parse(sessionId: String, cwd: String) -> ConversationInfo {
+        // Guard against attacker-supplied cwd / sessionId from the socket.
+        // sessionId must look like a real Claude session identifier (UUID-ish).
+        let empty = ConversationInfo(summary: nil, lastMessage: nil, lastMessageRole: nil, lastToolName: nil, firstUserMessage: nil, lastUserMessageDate: nil)
+        let sessionPattern = #"^[A-Za-z0-9_-]{8,128}$"#
+        guard sessionId.range(of: sessionPattern, options: .regularExpression) != nil else {
+            return empty
+        }
+
         let projectDir = cwd.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ".", with: "-")
         let sessionFile = ClaudePaths.projectsDir.path + "/" + projectDir + "/" + sessionId + ".jsonl"
+
+        // Containment check — `cwd` could in theory contain "../" survivors after
+        // the `/`/`.` flattening (e.g. "....//"). After standardization the path
+        // must still be inside ClaudePaths.projectsDir.
+        let resolved = URL(fileURLWithPath: sessionFile).standardizedFileURL.path
+        let basePrefix = ClaudePaths.projectsDir.standardizedFileURL.path + "/"
+        guard resolved.hasPrefix(basePrefix) else { return empty }
 
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: sessionFile),

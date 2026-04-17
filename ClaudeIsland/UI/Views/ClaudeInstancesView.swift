@@ -124,18 +124,18 @@ struct ClaudeInstancesView: View {
 
     private func sendInputToSession(_ session: SessionState, text: String) {
         Task {
-            let tmux = TmuxController.shared
-            var target: TmuxTarget?
-
-            if let pid = session.pid {
-                target = await tmux.findTmuxTarget(forClaudePid: pid)
-            }
-            if target == nil {
-                target = await tmux.findTmuxTarget(forWorkingDirectory: session.cwd)
-            }
-
-            if let target {
-                _ = await tmux.sendMessage(text, to: target)
+            // Route through TerminalRouter so this works in tmux, Terminal.app,
+            // iTerm2, Cursor, VS Code, Warp — anywhere we can detect.
+            let host = await TerminalRouter.shared.detectHost(
+                forSessionPid: session.pid,
+                isInTmux: session.isInTmux
+            )
+            if host.canSend {
+                if host.requiresFocus, !KeystrokeInjector.isAccessibilityTrusted() {
+                    _ = await MainActor.run { KeystrokeInjector.requestAccessibility(prompt: true) }
+                    return
+                }
+                _ = await TerminalRouter.shared.sendMessage(text, to: host)
             }
         }
     }
@@ -163,6 +163,16 @@ struct InstanceRow: View {
     /// Whether we're showing the approval UI
     private var isWaitingForApproval: Bool {
         session.phase.isWaitingForApproval
+    }
+
+    /// Whether we're showing the AskUserQuestion inline picker
+    private var isWaitingForAnswer: Bool {
+        session.phase.isWaitingForAnswer
+    }
+
+    /// The pending QuestionContext, if any
+    private var inlineQuestionContext: QuestionContext? {
+        session.phase.questionContext
     }
 
     /// Whether the pending tool requires interactive input (not just approve/deny)
@@ -279,6 +289,22 @@ struct InstanceRow: View {
                         }
                         .padding(.top, 2)
                     }
+                } else if isWaitingForAnswer, let ctx = inlineQuestionContext {
+                    // AskUserQuestion mirror mode — inline picker right in the row
+                    InlineQuestionPicker(
+                        context: ctx,
+                        onPick: { _, optionIdx in
+                            // Send Down × optionIdx + Enter through TerminalRouter.
+                            // Routes to tmux send-keys, AppleScript, or CGEvent
+                            // depending on host.
+                            let s = session
+                            Task {
+                                _ = await TerminalRouter.shared.sendOptionPick(
+                                    optionIndex: optionIdx, for: s
+                                )
+                            }
+                        }
+                    )
                 } else if let role = session.lastMessageRole {
                     switch role {
                     case "tool":
@@ -395,7 +421,7 @@ struct InstanceRow: View {
         .padding(.trailing, 14)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
+        .onTapGesture {
             onChat()
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isWaitingForApproval)
@@ -420,16 +446,11 @@ struct InstanceRow: View {
                     spinnerPhase = (spinnerPhase + 1) % spinnerSymbols.count
                 }
         case .waitingForApproval:
-            Text(spinnerSymbols[spinnerPhase % spinnerSymbols.count])
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(TerminalColors.amber)
-                .onReceive(spinnerTimer) { _ in
-                    spinnerPhase = (spinnerPhase + 1) % spinnerSymbols.count
-                }
+            // Pixel "?" — purple, blinking
+            PermissionIndicatorIcon(size: 12, style: .permission)
         case .waitingForAnswer:
-            Image(systemName: "questionmark.circle.fill")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(TerminalColors.amber)
+            // Pixel "?" — orange, static
+            PermissionIndicatorIcon(size: 12, style: .answer)
         case .waitingForInput:
             Circle()
                 .fill(TerminalColors.green)
@@ -587,5 +608,102 @@ struct TerminalButton: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Inline Question Picker (AskUserQuestion mirror in row)
+
+/// Compact picker rendered inline in a Claude row when the session is in
+/// .waitingForAnswer. Shows the first un-picked question's options as chips.
+/// Tapping a chip routes the keystroke into the terminal picker so the
+/// terminal session submits without the user leaving the island.
+struct InlineQuestionPicker: View {
+    let context: QuestionContext
+    let onPick: (_ questionIdx: Int, _ optionIdx: Int) -> Void
+
+    /// Track which question we're currently on (advances after each pick).
+    @State private var currentQuestion: Int = 0
+    @State private var pickedIdx: Int? = nil
+
+    private let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
+
+    private var question: PendingQuestion? {
+        guard currentQuestion < context.questions.count else { return nil }
+        return context.questions[currentQuestion]
+    }
+
+    var body: some View {
+        if let q = question {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text(q.header.uppercased())
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .tracking(0.6)
+                        .foregroundColor(claudeOrange)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(claudeOrange.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                    if context.questions.count > 1 {
+                        Text("\(currentQuestion + 1)/\(context.questions.count)")
+                            .font(.system(size: 8, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+                Text(q.question)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(0..<q.options.count, id: \.self) { idx in
+                            let opt = q.options[idx]
+                            Button {
+                                pickedIdx = idx
+                                onPick(currentQuestion, idx)
+                                // Advance to the next question after a beat so the user
+                                // sees their pick before the chip set swaps.
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                    pickedIdx = nil
+                                    if currentQuestion + 1 < context.questions.count {
+                                        currentQuestion += 1
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    if pickedIdx == idx {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 8, weight: .bold))
+                                    }
+                                    Text(opt.label)
+                                        .font(.system(size: 10, weight: pickedIdx == idx ? .semibold : .medium))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(pickedIdx == idx ? claudeOrange : .white.opacity(0.85))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    pickedIdx == idx
+                                    ? claudeOrange.opacity(0.16)
+                                    : Color.white.opacity(0.10)
+                                )
+                                .overlay(
+                                    Capsule().strokeBorder(
+                                        pickedIdx == idx ? claudeOrange.opacity(0.55) : Color.clear,
+                                        lineWidth: 1
+                                    )
+                                )
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .help(opt.description ?? opt.label)
+                        }
+                    }
+                }
+                .padding(.top, 1)
+            }
+        }
     }
 }

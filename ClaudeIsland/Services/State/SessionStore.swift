@@ -155,8 +155,13 @@ actor SessionStore {
         let newPhase = event.determinePhase()
 
         if session.phase.canTransition(to: newPhase) {
+            let oldDesc = String(describing: session.phase)
             session.phase = newPhase
+            if case .waitingForAnswer = newPhase {
+                NSLog("[DI-Question] phase TRANSITIONED to .waitingForAnswer (was \(oldDesc)) for session \(sessionId.prefix(8))")
+            }
         } else {
+            NSLog("[DI-Question] BLOCKED transition: \(String(describing: session.phase)) -> \(String(describing: newPhase))")
             Self.logger.debug("Invalid transition: \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public), ignoring")
         }
 

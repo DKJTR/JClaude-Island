@@ -36,6 +36,27 @@ enum KeystrokeInjector {
         app.activate(options: [.activateAllWindows])
     }
 
+    /// Press a single virtual-key (down + up) into the focused window.
+    /// `keyCode` is the macOS HID virtual key (e.g., 0x7D = Down, 0x24 = Return).
+    @discardableResult
+    static func pressKey(_ keyCode: CGKeyCode, repeats: Int = 1, gapMs: UInt32 = 30_000) -> Bool {
+        guard isAccessibilityTrusted() else {
+            logger.warning("Cannot press key — Accessibility not granted")
+            return false
+        }
+        guard let source = CGEventSource(stateID: .hidSystemState) else { return false }
+        for i in 0..<max(1, repeats) {
+            guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+                  let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+            else { return false }
+            down.post(tap: .cghidEventTap)
+            usleep(8_000)
+            up.post(tap: .cghidEventTap)
+            if i < repeats - 1 { usleep(gapMs) }
+        }
+        return true
+    }
+
     /// Inject `text` followed by Return into the currently-focused window.
     /// Caller must ensure the right host is focused (use `activateApp` first).
     /// Returns false if Accessibility is not trusted.

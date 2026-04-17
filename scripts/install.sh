@@ -45,11 +45,31 @@ dmg_url=$(printf '%s' "$release_json" \
 [[ -n "${dmg_url:-}" ]] || fail "No .dmg asset on the latest release. Try the manual download."
 ok "Found $(basename "$dmg_url")"
 
+# Optional: pull a SHA-256 from the release body. Format expected in notes:
+#   sha256: <64-hex>
+# If absent, we warn and proceed (so the install still works for older releases),
+# but a published checksum is the authoritative defense against a tampered DMG.
+expected_sha=$(printf '%s' "$release_json" \
+    | grep -Eoi 'sha256:[[:space:]]*[a-f0-9]{64}' \
+    | head -1 \
+    | sed -E 's/sha256:[[:space:]]*//I')
+
 # ─── 2. Download + mount + copy ───────────────────────────────────────────────
 dmg_path="$TMP_DIR/jclaude-island.dmg"
 info "Downloading"
 curl -fsSL --progress-bar "$dmg_url" -o "$dmg_path"
 ok "Downloaded $(du -h "$dmg_path" | cut -f1)"
+
+if [[ -n "$expected_sha" ]]; then
+    info "Verifying SHA-256"
+    actual_sha=$(shasum -a 256 "$dmg_path" | awk '{print $1}')
+    if [[ "$actual_sha" != "$expected_sha" ]]; then
+        fail "SHA-256 mismatch — expected $expected_sha, got $actual_sha"
+    fi
+    ok "SHA-256 matches"
+else
+    info "(No SHA-256 in release notes — skipping integrity check)"
+fi
 
 info "Mounting DMG"
 mount_out=$(hdiutil attach -nobrowse -quiet "$dmg_path")
@@ -75,6 +95,16 @@ ok "Installed $APP_NAME.app"
 
 # Strip macOS quarantine so Gatekeeper doesn't ask twice
 xattr -dr com.apple.quarantine "$dest_app" 2>/dev/null || true
+
+# Gatekeeper assessment — once we're notarized this will print "accepted",
+# meanwhile (ad-hoc signed builds) it'll be rejected and we just warn.
+if command -v spctl &>/dev/null; then
+    if spctl -a -t exec -vv "$dest_app" 2>&1 | grep -q "accepted"; then
+        ok "Gatekeeper: accepted (Developer-ID signed)"
+    else
+        info "Gatekeeper: app is not Developer-ID notarized — first launch may show a warning"
+    fi
+fi
 
 # ─── 3. Hook script ───────────────────────────────────────────────────────────
 info "Installing Claude Code hook"

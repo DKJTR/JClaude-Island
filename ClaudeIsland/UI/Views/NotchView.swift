@@ -24,6 +24,7 @@ struct NotchView: View {
     @ObservedObject private var updateManager = UpdateManager.shared
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
+    @State private var settingsTick: Int = 0  // re-renders when AppSettings change
     @State private var waitingForInputTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForInput
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
@@ -50,6 +51,16 @@ struct NotchView: View {
     /// Whether any Claude session has a pending AskUserQuestion
     private var hasPendingQuestion: Bool {
         sessionMonitor.instances.contains { $0.phase.isWaitingForAnswer }
+    }
+
+    /// Which "?" indicator style to show — or nil if no pending user action.
+    private var attentionIndicatorStyle: PermissionIndicatorStyle? {
+        switch (hasPendingPermission, hasPendingQuestion) {
+        case (true, true):   return .alternating
+        case (true, false):  return .permission
+        case (false, true):  return .answer
+        case (false, false): return nil
+        }
     }
 
     /// Whether any Claude session is waiting for user input (done/ready state) within the display window
@@ -86,14 +97,21 @@ struct NotchView: View {
         isAnyProcessing || hasPendingPermission || hasPendingQuestion || hasWaitingForInput
     }
 
-    /// Whether media is playing
+    /// Whether media is playing (and the user hasn't disabled the section)
     private var hasMediaActivity: Bool {
-        mediaService.isActive && (mediaService.nowPlaying?.hasContent ?? false)
+        AppSettings.showNowPlaying
+            && mediaService.isActive
+            && (mediaService.nowPlaying?.hasContent ?? false)
     }
 
-    /// Whether a Bluetooth device just connected (brief animation)
+    /// Whether a Bluetooth device just connected (and the section is enabled)
     private var hasBluetoothConnection: Bool {
-        bluetoothService.recentlyConnected != nil
+        AppSettings.showBluetooth && bluetoothService.recentlyConnected != nil
+    }
+
+    /// Whether the BT section should appear in the expanded panel at all
+    private var showsBluetoothSection: Bool {
+        AppSettings.showBluetooth && !bluetoothService.connectedDevices.isEmpty
     }
 
     /// Closed notch expansion: show Claude if actively working, else show media
@@ -253,7 +271,16 @@ struct NotchView: View {
             if !viewModel.hasPhysicalNotch {
                 isVisible = true
             }
+            // Bump on AppSettings changes so the toggles take effect immediately.
+            NotificationCenter.default.addObserver(
+                forName: AppSettings.didChangeNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                settingsTick &+= 1
+            }
         }
+        .id(settingsTick)  // forces a re-render when settings change
         .onChange(of: viewModel.status) { oldStatus, newStatus in
             handleStatusChange(from: oldStatus, to: newStatus)
         }
@@ -329,8 +356,8 @@ struct NotchView: View {
                 if hasClaudeVisibleState {
                     HStack(spacing: 4) {
                         ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                        if hasPendingPermission || hasPendingQuestion {
-                            PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
+                        if let style = attentionIndicatorStyle {
+                            PermissionIndicatorIcon(size: 14, style: style)
                         }
                     }
                     .padding(.leading, 8)
@@ -351,8 +378,8 @@ struct NotchView: View {
                 // CLOSED — Claude mode: crab left, spinner right
                 HStack(spacing: 4) {
                     ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                    if hasPendingPermission || hasPendingQuestion {
-                        PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
+                    if let style = attentionIndicatorStyle {
+                        PermissionIndicatorIcon(size: 14, style: style)
                     }
                 }
                 .frame(width: sideWidth + ((hasPendingPermission || hasPendingQuestion) ? 18 : 0))
@@ -489,8 +516,8 @@ struct NotchView: View {
                         CompactMediaRow(mediaService: mediaService)
                     }
 
-                    // Bluetooth section (paginated, max 3 visible)
-                    if !bluetoothService.connectedDevices.isEmpty {
+                    // Bluetooth section (paginated, max 3 visible) — gated by setting
+                    if showsBluetoothSection {
                         Divider()
                             .background(Color.white.opacity(0.08))
                             .padding(.vertical, 4)
@@ -498,7 +525,7 @@ struct NotchView: View {
                     }
 
                     // Nothing active
-                    if sessionMonitor.instances.isEmpty && !hasMediaActivity && bluetoothService.connectedDevices.isEmpty {
+                    if sessionMonitor.instances.isEmpty && !hasMediaActivity && !showsBluetoothSection {
                         VStack(spacing: 8) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 20, weight: .light))

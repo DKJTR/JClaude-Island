@@ -88,11 +88,32 @@ struct HookInstaller {
 
         json["hooks"] = hooks
 
-        if let data = try? JSONSerialization.data(
+        guard let data = try? JSONSerialization.data(
             withJSONObject: json,
             options: [.prettyPrinted, .sortedKeys]
-        ) {
-            try? data.write(to: settingsURL)
+        ) else { return }
+
+        // One-time backup so a crash in mid-write can't lose user state.
+        let fm = FileManager.default
+        if fm.fileExists(atPath: settingsURL.path) {
+            let stamp = ISO8601DateFormatter().string(from: Date())
+                .replacingOccurrences(of: ":", with: "-")
+            let backup = settingsURL.deletingLastPathComponent()
+                .appendingPathComponent("settings.json.bak.\(stamp)")
+            if !fm.fileExists(atPath: backup.path) {
+                try? fm.copyItem(at: settingsURL, to: backup)
+            }
+        }
+
+        // Atomic write: write to temp peer in the same directory, then replace.
+        let tmp = settingsURL.appendingPathExtension("tmp.\(getpid())")
+        do {
+            try data.write(to: tmp, options: .atomic)
+            _ = try fm.replaceItemAt(settingsURL, withItemAt: tmp)
+        } catch {
+            try? fm.removeItem(at: tmp)
+            // As a last resort, fall back to non-atomic write rather than no-op
+            try? data.write(to: settingsURL, options: .atomic)
         }
     }
 

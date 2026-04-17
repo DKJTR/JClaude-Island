@@ -86,16 +86,29 @@ struct QuestionContext: Sendable {
 
     /// Parse from PreToolUse tool_input payload
     nonisolated static func parse(toolUseId: String, toolInput: [String: AnyCodable]?) -> QuestionContext? {
-        guard let input = toolInput,
-              let questionsRaw = input["questions"]?.value as? [Any]
-        else { return nil }
+        guard let input = toolInput else {
+            NSLog("[DI-Question] parse: no toolInput")
+            return nil
+        }
+        NSLog("[DI-Question] parse: input keys = \(input.keys.joined(separator: ","))")
+        guard let questionsRaw = input["questions"]?.value as? [Any] else {
+            NSLog("[DI-Question] parse: questions not [Any], type=\(type(of: input["questions"]?.value as Any))")
+            return nil
+        }
+        NSLog("[DI-Question] parse: \(questionsRaw.count) raw questions")
 
         let parsed: [PendingQuestion] = questionsRaw.compactMap { item in
-            guard let dict = item as? [String: Any],
-                  let q = dict["question"] as? String,
+            guard let dict = item as? [String: Any] else {
+                NSLog("[DI-Question] item not [String: Any], type=\(type(of: item))")
+                return nil
+            }
+            guard let q = dict["question"] as? String,
                   let header = dict["header"] as? String,
                   let optsRaw = dict["options"] as? [Any]
-            else { return nil }
+            else {
+                NSLog("[DI-Question] missing q/header/options. keys=\(dict.keys.joined(separator: ","))")
+                return nil
+            }
             let multi = dict["multiSelect"] as? Bool ?? false
             let opts: [PendingQuestionOption] = optsRaw.compactMap { opt in
                 guard let od = opt as? [String: Any],
@@ -103,10 +116,17 @@ struct QuestionContext: Sendable {
                 else { return nil }
                 return PendingQuestionOption(label: label, description: od["description"] as? String)
             }
-            guard !opts.isEmpty else { return nil }
+            guard !opts.isEmpty else {
+                NSLog("[DI-Question] no options parsed for question: \(q)")
+                return nil
+            }
             return PendingQuestion(question: q, header: header, multiSelect: multi, options: opts)
         }
-        guard !parsed.isEmpty else { return nil }
+        guard !parsed.isEmpty else {
+            NSLog("[DI-Question] no questions parsed")
+            return nil
+        }
+        NSLog("[DI-Question] parse OK: \(parsed.count) questions")
         return QuestionContext(toolUseId: toolUseId, questions: parsed, receivedAt: Date())
     }
 }

@@ -148,9 +148,10 @@ extension HookEvent {
            tool == "AskUserQuestion",
            status == "waiting_for_answer" {
             if let ctx = QuestionContext.parse(toolUseId: toolUseId ?? "", toolInput: toolInput) {
+                NSLog("[DI-Question] determinePhase → .waitingForAnswer (\(ctx.questions.count) q)")
                 return .waitingForAnswer(ctx)
             }
-            // Malformed question — fall back to processing rather than into the permission branch
+            NSLog("[DI-Question] determinePhase → .processing (parse failed)")
             return .processing
         }
 

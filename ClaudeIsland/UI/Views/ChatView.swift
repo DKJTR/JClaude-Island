@@ -505,11 +505,32 @@ struct ChatView: View {
     }
 
     private func submitQuestionAnswers(_ answers: [String: String]) {
-        sessionMonitor.answerQuestion(sessionId: sessionId, answers: answers)
+        guard let ctx = questionContext else { return }
+        Task {
+            let host = await TerminalRouter.shared.detectHost(
+                forSessionPid: session.pid,
+                isInTmux: session.isInTmux
+            )
+            if host.canSend {
+                // CGEvent fallback requires Accessibility — prompt lazily
+                if host.requiresFocus, !KeystrokeInjector.isAccessibilityTrusted() {
+                    _ = await MainActor.run { KeystrokeInjector.requestAccessibility(prompt: true) }
+                    return
+                }
+                _ = await TerminalRouter.shared.sendQuestionAnswers(
+                    answers, context: ctx, to: host
+                )
+                // The terminal picker will submit and Claude Code's PostToolUse
+                // will clear the island's waitingForAnswer phase automatically.
+            } else {
+                // No detectable host (e.g., session ended) — clear locally
+                sessionMonitor.answerQuestion(sessionId: sessionId, answers: answers)
+            }
+        }
     }
 
     private func cancelQuestion() {
-        // Empty answers → hook will fall through to terminal picker
+        // Just clear local phase — terminal picker remains for the user to answer there
         sessionMonitor.answerQuestion(sessionId: sessionId, answers: [:])
     }
 

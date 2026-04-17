@@ -34,6 +34,10 @@ enum NotificationSound: String, CaseIterable {
 enum AppSettings {
     private static let defaults = UserDefaults.standard
 
+    /// Posted whenever a visibility-affecting setting changes
+    /// (showNowPlaying, showBluetooth). Subscribers re-render to honor it.
+    static let didChangeNotification = Notification.Name("AppSettingsDidChange")
+
     // MARK: - Keys
 
     private enum Keys {
@@ -64,13 +68,19 @@ enum AppSettings {
     /// Whether to show Now Playing info in the notch
     static var showNowPlaying: Bool {
         get { defaults.object(forKey: Keys.showNowPlaying) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.showNowPlaying) }
+        set {
+            defaults.set(newValue, forKey: Keys.showNowPlaying)
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
     }
 
     /// Whether to show Bluetooth devices in the notch
     static var showBluetooth: Bool {
         get { defaults.object(forKey: Keys.showBluetooth) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.showBluetooth) }
+        set {
+            defaults.set(newValue, forKey: Keys.showBluetooth)
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
     }
 
     // MARK: - Claude Directory

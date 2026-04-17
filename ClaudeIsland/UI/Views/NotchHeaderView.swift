@@ -92,30 +92,81 @@ struct ClaudeCrabIcon: View {
     }
 }
 
-// Pixel art permission indicator icon
+/// Brand colors for the two kinds of pending user action
+enum IslandAttentionColor {
+    /// Soft lavender — permission approvals
+    static let permission = Color(red: 0.60, green: 0.47, blue: 0.92)
+    /// Claude orange — AskUserQuestion answers
+    static let question = Color(red: 0.85, green: 0.47, blue: 0.34)
+}
+
+/// How a PermissionIndicatorIcon should behave
+enum PermissionIndicatorStyle: Equatable {
+    /// Permission request — purple, blinking
+    case permission
+    /// AskUserQuestion — orange, static
+    case answer
+    /// Both kinds pending at once — alternates purple ↔ orange
+    case alternating
+}
+
+// Pixel art question-mark indicator icon
 struct PermissionIndicatorIcon: View {
     let size: CGFloat
-    let color: Color
+    let style: PermissionIndicatorStyle
 
-    init(size: CGFloat = 14, color: Color = Color(red: 0.11, green: 0.12, blue: 0.13)) {
+    @State private var blinkOn = true
+    @State private var useQuestionColor = false
+
+    init(size: CGFloat = 14, style: PermissionIndicatorStyle = .permission) {
         self.size = size
-        self.color = color
+        self.style = style
     }
 
-    // Visible pixel positions from the SVG (at 30x30 scale)
+    // Legacy constructor — still takes a raw color, used by the existing
+    // call-sites during the transition
+    init(size: CGFloat = 14, color: Color) {
+        self.size = size
+        self.style = .permission  // style is ignored; color overrides below
+        self._blinkOn = State(initialValue: true)
+        self._overrideColor = State(initialValue: color)
+    }
+    @State private var overrideColor: Color? = nil
+
+    private var currentColor: Color {
+        if let c = overrideColor { return c }
+        switch style {
+        case .permission:
+            return IslandAttentionColor.permission
+        case .answer:
+            return IslandAttentionColor.question
+        case .alternating:
+            return useQuestionColor ? IslandAttentionColor.question : IslandAttentionColor.permission
+        }
+    }
+
+    private var currentOpacity: Double {
+        switch style {
+        case .permission:
+            return blinkOn ? 1.0 : 0.3
+        case .answer, .alternating:
+            return 1.0
+        }
+    }
+
+    // Visible pixel positions (at 30x30 scale) — forms a "?"
     private let pixels: [(CGFloat, CGFloat)] = [
-        (7, 7), (7, 11),           // Left column
-        (11, 3),                    // Top left
-        (15, 3), (15, 19), (15, 27), // Center column
-        (19, 3), (19, 15),          // Right of center
-        (23, 7), (23, 11)           // Right column
+        (7, 7), (7, 11),
+        (11, 3),
+        (15, 3), (15, 19), (15, 27),
+        (19, 3), (19, 15),
+        (23, 7), (23, 11)
     ]
 
     var body: some View {
         Canvas { context, canvasSize in
             let scale = size / 30.0
             let pixelSize: CGFloat = 4 * scale
-
             for (x, y) in pixels {
                 let rect = CGRect(
                     x: x * scale - pixelSize / 2,
@@ -123,10 +174,40 @@ struct PermissionIndicatorIcon: View {
                     width: pixelSize,
                     height: pixelSize
                 )
-                context.fill(Path(rect), with: .color(color))
+                context.fill(Path(rect), with: .color(currentColor))
             }
         }
         .frame(width: size, height: size)
+        .opacity(currentOpacity)
+        .onAppear { startAnimationIfNeeded() }
+        .onChange(of: style) { _, _ in startAnimationIfNeeded() }
+    }
+
+    private func startAnimationIfNeeded() {
+        switch style {
+        case .permission:
+            // Opacity blink every 0.6s
+            Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { t in
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        blinkOn.toggle()
+                    }
+                }
+                if self.style != .permission { t.invalidate() }
+            }
+        case .alternating:
+            // Color swap every 0.7s
+            Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { t in
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        useQuestionColor.toggle()
+                    }
+                }
+                if self.style != .alternating { t.invalidate() }
+            }
+        case .answer:
+            break
+        }
     }
 }
 

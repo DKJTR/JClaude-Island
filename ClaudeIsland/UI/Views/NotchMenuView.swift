@@ -118,7 +118,18 @@ struct NotchMenuView: View {
                     icon: "star",
                     label: "Star on GitHub"
                 ) {
-                    if let url = URL(string: "https://github.com/farouqaldori/claude-island") {
+                    if let url = URL(string: "https://github.com/DKJTR/JClaude-Island") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+
+                MenuRow(
+                    icon: "heart",
+                    label: "Donate"
+                ) {
+                    // Stripe payment link supports cards + Apple Pay + Google Pay globally;
+                    // jack can swap this for ko-fi/buymeacoffee/github sponsors any time.
+                    if let url = URL(string: "https://github.com/sponsors/DKJTR") {
                         NSWorkspace.shared.open(url)
                     }
                 }
@@ -126,6 +137,23 @@ struct NotchMenuView: View {
                 Divider()
                     .background(Color.white.opacity(0.08))
                     .padding(.vertical, 4)
+
+                // Tiny credit — clickable, opens upstream Claude Island repo
+                Button {
+                    if let url = URL(string: "https://github.com/farouqaldori/claude-island") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Text("Forked from claude-island by Farouq Aldori")
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.32))
+                        .underline()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
                 MenuRow(
                     icon: "xmark.circle",

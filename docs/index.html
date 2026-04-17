@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JClaude Island — AI copilot and music, together in the notch</title>
-<meta name="description" content="A unified macOS notch app for Claude Code sessions, Spotify, Apple Music, and Bluetooth devices.">
+<title>JClaude Island — Answer Claude from your macOS notch</title>
+<meta name="description" content="Macbook notch app that lets you answer Claude Code's AskUserQuestion and approve tools without leaving the notch. Works with tmux, Terminal, iTerm2, Cursor, VS Code, Warp.">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
-<meta property="og:title" content="JClaude Island">
-<meta property="og:description" content="Your AI copilot and music, together in the macOS notch.">
+<meta property="og:title" content="JClaude Island — Answer Claude from your notch">
+<meta property="og:description" content="When Claude Code asks a question, the option chips render right in the macOS notch. One click answers. Works with Cursor, VS Code, Terminal, tmux, Warp.">
 <meta property="og:image" content="https://jclaude-island.aipm-cychien.work/og-image.png">
 <meta property="og:type" content="website">
 <style>
@@ -368,18 +368,19 @@ footer a { color: rgba(255,255,255,0.5); }
 
 <section class="hero">
   <div class="icon">J✳</div>
-  <h1>JClaude Island</h1>
-  <p class="tagline">Your AI copilot and music, together in the notch.</p>
+  <h1>Answer Claude. From the notch.</h1>
+  <p class="tagline">When Claude asks a question, the option chips appear in your notch — one click answers it. Permission prompts, music, AirPods battery, all in the same place. No window. No alt-tab.</p>
   <div class="cta-row">
-    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary">Download DMG</a>
-    <a href="https://github.com/DKJTR/JClaude-Island" class="btn btn-secondary">View on GitHub</a>
+    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary">Download v1.4 DMG</a>
+    <a href="#install" class="btn btn-secondary">curl install</a>
   </div>
   <div class="tags">
-    <span class="tag">Claude Code</span>
-    <span class="tag">Spotify</span>
-    <span class="tag">Apple Music</span>
-    <span class="tag">AirPods Battery</span>
-    <span class="tag">macOS Notch</span>
+    <span class="tag">AskUserQuestion</span>
+    <span class="tag">Cursor / VS Code / Warp</span>
+    <span class="tag">tmux + iTerm2</span>
+    <span class="tag">Spotify · Apple Music</span>
+    <span class="tag">AirPods battery</span>
+    <span class="tag">macOS 15+</span>
   </div>
 </section>
 
@@ -550,32 +551,57 @@ footer a { color: rgba(255,255,255,0.5); }
 <section class="features">
   <div class="feature">
     <div class="feature-icon">✦</div>
-    <h3>Claude Code</h3>
-    <p>Multi-session monitoring with token % bars. Tool approval and AskUserQuestion from the notch.</p>
+    <h3>Answer Claude in-place</h3>
+    <p>AskUserQuestion options render as chips right in the notch row. One click sends the answer to the terminal picker. Mirror mode keeps both UIs in sync.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">⌨</div>
+    <h3>Any terminal</h3>
+    <p>tmux, Terminal.app, iTerm2, Cursor, VS Code, Warp, Ghostty. The router auto-detects your host and uses the right strategy — AppleScript or CGEvent.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">?</div>
+    <h3>Tells you what's needed</h3>
+    <p>Permission requests get a purple blinking pixel <code>?</code>. Questions get a static orange one. Both at once → it alternates. Glance and you know.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">🎵</div>
     <h3>Now Playing</h3>
-    <p>Spotify and Apple Music. Seekable progress bar. Album art crossfade. Click to open.</p>
+    <p>Spotify and Apple Music. Seekable progress, album crossfade, click to open. Toggle off if you don't want it.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">🎧</div>
-    <h3>Bluetooth</h3>
-    <p>AirPods L/R/Case battery. Headphones, trackpad, keyboard. Pairing animation.</p>
+    <h3>AirPods battery</h3>
+    <p>L / R / Case breakdown. Trackpad, keyboard, headphones. Brief animation when something pairs. Toggle off if you don't want it.</p>
   </div>
   <div class="feature">
-    <div class="feature-icon">✨</div>
-    <h3>Smart Priority</h3>
-    <p>Claude when active, music when idle. Dynamic height. Waveform, blur, glow.</p>
+    <div class="feature-icon">🔒</div>
+    <h3>Local-only by design</h3>
+    <p>No telemetry. No analytics. Per-process socket auth. AppleScript injection-safe. Atomic settings write. Nothing leaves your Mac.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">⚡</div>
+    <h3>One-line install</h3>
+    <p><code>curl ... | bash</code> downloads the DMG, copies the app, wires the Claude Code hooks, and launches. Re-run any time to update.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">🔔</div>
+    <h3>Sound alerts</h3>
+    <p>Your chosen system chime fires when a new permission or question arrives — only if your terminal isn't already in front.</p>
   </div>
 </section>
 
 <!-- Install + Requirements side by side -->
-<div class="bottom-grid">
+<div class="bottom-grid" id="install">
   <div>
-    <h2>Install</h2>
-    <pre><span class="comment"># Download the DMG from GitHub Releases, or build from source:</span>
-<span class="cmd">git clone</span> https://github.com/DKJTR/JClaude-Island.git
+    <h2>Install in one line</h2>
+    <pre><span class="comment"># Downloads the signed DMG, copies to /Applications,</span>
+<span class="comment"># wires the Claude Code hooks, launches. Re-run to update.</span>
+<span class="cmd">curl</span> -fsSL https://raw.githubusercontent.com/DKJTR/JClaude-Island/main/scripts/install.sh \
+  | <span class="cmd">bash</span></pre>
+
+    <h2 style="margin-top:32px">Or build from source</h2>
+    <pre><span class="cmd">git clone</span> https://github.com/DKJTR/JClaude-Island.git
 <span class="cmd">cd</span> JClaude-Island
 <span class="cmd">xcodebuild</span> -scheme ClaudeIsland -configuration Release build \
   -destination "platform=macOS,arch=arm64" CODE_SIGN_IDENTITY="-"</pre>
@@ -585,15 +611,25 @@ footer a { color: rgba(255,255,255,0.5); }
     <ul class="req-list">
       <li>macOS 15.0+ with a notched MacBook</li>
       <li>Claude Code CLI</li>
-      <li>Spotify or Apple Music</li>
-      <li>Xcode (build from source only)</li>
+      <li>Python 3 (system Python is fine)</li>
+      <li>Spotify / Apple Music (optional)</li>
     </ul>
+
+    <h2 style="margin-top:32px">First-launch permissions</h2>
+    <ul class="req-list">
+      <li>Bluetooth — battery levels</li>
+      <li>Apple Events — Terminal / iTerm send</li>
+      <li>Accessibility — Cursor / VS Code / Warp send</li>
+    </ul>
+    <p style="margin-top:14px;color:rgba(255,255,255,0.4);font-size:13px">
+      Skip any you don't need — those features just won't fire. Nothing leaves your Mac either way.
+    </p>
   </div>
 </div>
 
 <footer>
   <p>Built on <a href="https://github.com/farouqaldori/claude-island">Claude Island</a> by Farouq Aldori. Apache 2.0 License.</p>
-  <p style="margin-top:8px">Made by <a href="https://aipm-cychien.work">Jack Chien</a></p>
+  <p style="margin-top:8px">Made by <a href="https://aipm-cychien.work">Jack Chien</a> · <a href="https://github.com/sponsors/DKJTR">Sponsor</a> · <a href="https://github.com/DKJTR/JClaude-Island">GitHub</a></p>
 </footer>
 
 <script>
