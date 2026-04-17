@@ -16,8 +16,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  background: #0d0b12;
-  color: #fff;
+  background: #0d0b12; color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
   line-height: 1.6;
 }
@@ -26,21 +25,21 @@ a:hover { text-decoration: underline; }
 
 /* Hero */
 .hero {
-  min-height: 80vh;
+  min-height: 70vh;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 60px 24px;
+  text-align: center; padding: 80px 40px 60px;
   background: linear-gradient(165deg, #1a1525 0%, #0d0b12 40%, #0f1a15 70%, #0d0b12 100%);
   position: relative; overflow: hidden;
 }
 .hero::before {
-  content: ''; position: absolute; width: 500px; height: 500px;
+  content: ''; position: absolute; width: 600px; height: 600px;
   background: radial-gradient(circle, rgba(232,120,72,0.06) 0%, transparent 70%);
-  top: -150px; right: 50px;
+  top: -200px; right: 10%;
 }
 .hero::after {
-  content: ''; position: absolute; width: 500px; height: 500px;
+  content: ''; position: absolute; width: 600px; height: 600px;
   background: radial-gradient(circle, rgba(46,204,113,0.05) 0%, transparent 70%);
-  bottom: -150px; left: 100px;
+  bottom: -200px; left: 10%;
 }
 .hero > * { position: relative; z-index: 1; }
 .icon {
@@ -50,11 +49,11 @@ a:hover { text-decoration: underline; }
   font-size: 42px; color: rgba(255,255,255,0.9); font-weight: 600;
   margin-bottom: 32px; box-shadow: 0 12px 48px rgba(200,120,72,0.25);
 }
-h1 { font-size: clamp(32px, 5vw, 56px); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
-.tagline { font-size: 20px; color: rgba(255,255,255,0.5); margin-bottom: 40px; max-width: 500px; }
+h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+.tagline { font-size: clamp(16px, 2vw, 20px); color: rgba(255,255,255,0.5); margin-bottom: 40px; max-width: 600px; }
 .cta-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
 .btn {
-  padding: 14px 28px; border-radius: 12px; font-size: 16px; font-weight: 600;
+  padding: 14px 32px; border-radius: 12px; font-size: 16px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 8px; transition: transform 0.15s;
 }
 .btn:hover { transform: translateY(-2px); text-decoration: none; }
@@ -67,59 +66,152 @@ h1 { font-size: clamp(32px, 5vw, 56px); font-weight: 700; letter-spacing: -0.5px
   color: rgba(255,255,255,0.4); font-size: 13px;
 }
 
-/* Showcase */
-.showcase {
-  max-width: 900px; margin: 0 auto; padding: 80px 24px;
+/* Animated Notch Demo */
+.demo-section {
+  max-width: 1200px; margin: 0 auto; padding: 60px 40px 80px;
 }
-.showcase img {
-  width: 100%; border-radius: 16px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+.demo-section h2 {
+  font-size: clamp(24px, 3vw, 36px); font-weight: 600; margin-bottom: 8px;
 }
+.demo-section .subtitle {
+  color: rgba(255,255,255,0.4); font-size: 16px; margin-bottom: 48px;
+}
+.demo-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+}
+@media (max-width: 800px) { .demo-grid { grid-template-columns: 1fr; } }
+.demo-card {
+  background: #161320; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px; padding: 28px; overflow: hidden;
+}
+.demo-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; margin-bottom: 20px;
+}
+.lbl-orange { color: #e87848; }
+.lbl-green { color: #2ecc71; }
+.lbl-cyan { color: #00bcd4; }
+.lbl-purple { color: #b388ff; }
+
+/* Animated notch pill */
+.notch-pill {
+  background: #000; border-radius: 20px; padding: 8px 18px;
+  display: flex; align-items: center; height: 40px; margin-bottom: 14px;
+  position: relative; overflow: hidden;
+}
+.notch-pill .gap { flex: 1; }
+.notch-pill .text { color: rgba(255,255,255,0.85); font-size: 12px; font-weight: 500; }
+.notch-pill .art {
+  width: 24px; height: 24px; border-radius: 5px;
+  background: linear-gradient(135deg, #8b5a3a, #c97b4a); flex-shrink: 0;
+}
+.notch-pill .claude-icon { color: #e87848; font-size: 16px; font-weight: bold; }
+.notch-pill .spinner { color: #e87848; font-size: 14px; font-weight: bold; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Waveform */
+.waveform { display: flex; align-items: center; gap: 2px; height: 24px; }
+.waveform span {
+  width: 3px; border-radius: 1.5px; background: #2ecc71;
+  animation: wave 0.5s ease-in-out infinite alternate;
+}
+.waveform span:nth-child(1) { height: 6px; animation-delay: 0s; }
+.waveform span:nth-child(2) { height: 14px; animation-delay: 0.1s; }
+.waveform span:nth-child(3) { height: 9px; animation-delay: 0.2s; }
+.waveform span:nth-child(4) { height: 16px; animation-delay: 0.07s; }
+.waveform span:nth-child(5) { height: 11px; animation-delay: 0.15s; }
+@keyframes wave { to { height: 4px; } }
+
+/* Expanded panel mock */
+.expanded-mock {
+  background: #161320; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; overflow: hidden;
+}
+.exp-row {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.exp-row:last-child { border-bottom: none; }
+.exp-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.exp-info { flex: 1; min-width: 0; }
+.exp-title { font-size: 13px; font-weight: 500; }
+.exp-sub { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 1px; }
+.tok-bar { width: 4px; height: 24px; border-radius: 2px; background: rgba(255,255,255,0.06); position: relative; overflow: hidden; }
+.tok-fill { position: absolute; bottom: 0; width: 100%; border-radius: 2px; }
+.tok-label { font-size: 8px; color: rgba(255,255,255,0.3); font-family: monospace; }
+
+/* Media row in expanded */
+.media-mock {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  background: rgba(255,255,255,0.02);
+}
+.media-art { width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #5a3a2a, #a07050); flex-shrink: 0; }
+.media-info { flex: 1; }
+.media-title { font-size: 13px; font-weight: 500; }
+.media-artist { font-size: 11px; color: rgba(255,255,255,0.4); }
+.media-ctrls { display: flex; gap: 14px; color: rgba(255,255,255,0.5); font-size: 16px; }
+.media-ctrls .play { color: #fff; }
+.prog-bar { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin: 10px 16px 8px; position: relative; }
+.prog-fill { height: 100%; border-radius: 2px; background: #2ecc71; animation: progress 8s linear infinite; }
+.prog-thumb { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; position: absolute; top: -2.5px; animation: thumb 8s linear infinite; box-shadow: 0 0 6px rgba(46,204,113,0.4); }
+@keyframes progress { 0% { width: 10%; } 100% { width: 95%; } }
+@keyframes thumb { 0% { left: 10%; } 100% { left: 95%; } }
+.prog-times { display: flex; justify-content: space-between; padding: 0 16px 12px; font-size: 10px; color: rgba(255,255,255,0.2); font-family: monospace; }
+
+/* BT section */
+.bt-header { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: #00bcd4; padding: 12px 16px 8px; }
+.bt-row { display: flex; align-items: center; gap: 10px; padding: 8px 16px; }
+.bt-emoji { font-size: 18px; width: 28px; text-align: center; }
+.bt-name { font-size: 12px; flex: 1; }
+.bt-pct { font-size: 11px; color: #2ecc71; }
 
 /* Features */
 .features {
-  max-width: 900px; margin: 0 auto; padding: 0 24px 80px;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  max-width: 1200px; margin: 0 auto; padding: 0 40px 80px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
 }
-@media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 500px) { .features { grid-template-columns: 1fr; } }
 .feature {
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px; padding: 24px;
+  border-radius: 16px; padding: 28px;
 }
 .feature h3 { font-size: 16px; margin-bottom: 8px; }
 .feature p { font-size: 14px; color: rgba(255,255,255,0.5); }
-.feature-icon { font-size: 24px; margin-bottom: 12px; }
+.feature-icon { font-size: 28px; margin-bottom: 14px; }
 
-/* Requirements */
-.requirements {
-  max-width: 900px; margin: 0 auto; padding: 0 24px 80px;
+/* Install + Requirements */
+.bottom-grid {
+  max-width: 1200px; margin: 0 auto; padding: 0 40px 80px;
+  display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 32px;
 }
-.requirements h2 { font-size: 24px; margin-bottom: 16px; }
+@media (max-width: 800px) { .bottom-grid { grid-template-columns: 1fr; } }
+.bottom-grid h2 { font-size: 24px; margin-bottom: 16px; }
+pre {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 20px; overflow-x: auto;
+  font-family: 'SF Mono', Menlo, monospace; font-size: 13px;
+  color: rgba(255,255,255,0.7); line-height: 1.8;
+}
+pre .comment { color: rgba(255,255,255,0.3); }
+pre .cmd { color: #2ecc71; }
 .req-list { list-style: none; }
-.req-list li { padding: 8px 0; color: rgba(255,255,255,0.6); font-size: 15px; }
+.req-list li { padding: 10px 0; color: rgba(255,255,255,0.6); font-size: 15px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.req-list li:last-child { border-bottom: none; }
 .req-list li::before { content: '✓ '; color: #2ecc71; font-weight: bold; }
 
-/* Footer */
 footer {
-  text-align: center; padding: 40px 24px;
+  text-align: center; padding: 40px 40px;
   border-top: 1px solid rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.3); font-size: 13px;
 }
 footer a { color: rgba(255,255,255,0.5); }
 
-/* Install code block */
-.install-block {
-  max-width: 900px; margin: 0 auto; padding: 0 24px 60px;
-}
-.install-block h2 { font-size: 24px; margin-bottom: 16px; }
-pre {
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px; padding: 20px; overflow-x: auto;
-  font-family: 'SF Mono', Menlo, monospace; font-size: 14px;
-  color: rgba(255,255,255,0.7); line-height: 1.8;
-}
-pre .comment { color: rgba(255,255,255,0.3); }
-pre .cmd { color: #2ecc71; }
+/* Notch switch animation */
+.notch-switcher { position: relative; height: 48px; margin-bottom: 8px; }
+.notch-state { position: absolute; inset: 0; transition: opacity 0.5s ease; }
+.notch-state.hidden { opacity: 0; pointer-events: none; }
+.demo-hint { font-size: 12px; color: rgba(255,255,255,0.25); margin-top: 12px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -129,12 +221,8 @@ pre .cmd { color: #2ecc71; }
   <h1>JClaude Island</h1>
   <p class="tagline">Your AI copilot and music, together in the notch.</p>
   <div class="cta-row">
-    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary">
-      Download DMG
-    </a>
-    <a href="https://github.com/DKJTR/JClaude-Island" class="btn btn-secondary">
-      View on GitHub
-    </a>
+    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary">Download DMG</a>
+    <a href="https://github.com/DKJTR/JClaude-Island" class="btn btn-secondary">View on GitHub</a>
   </div>
   <div class="tags">
     <span class="tag">Claude Code</span>
@@ -145,56 +233,169 @@ pre .cmd { color: #2ecc71; }
   </div>
 </section>
 
-<section class="showcase">
-  <img src="feature-showcase.png" alt="JClaude Island Features">
+<!-- Animated Demo Section -->
+<section class="demo-section">
+  <h2>See it in action</h2>
+  <p class="subtitle">The notch adapts to what you're doing. Claude processing? Music playing? Both? It just works.</p>
+
+  <div class="demo-grid">
+    <!-- Left: Animated closed notch states -->
+    <div class="demo-card">
+      <div class="demo-label lbl-orange">Closed Notch — Claude Processing</div>
+      <div class="notch-switcher" id="notchDemo">
+        <div class="notch-state" id="notch-claude">
+          <div class="notch-pill">
+            <span class="claude-icon">✦</span>
+            <span class="gap"></span>
+            <span class="spinner">✳</span>
+          </div>
+        </div>
+        <div class="notch-state hidden" id="notch-music">
+          <div class="notch-pill">
+            <div class="art"></div>
+            <span class="text" style="margin-left:8px">Bethel Music — King of My Heart</span>
+            <span class="gap"></span>
+            <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+      <div id="notch-label" class="demo-label lbl-orange" style="transition:color 0.3s">Claude takes priority when active</div>
+      <p class="demo-hint">
+        The notch automatically switches between Claude and music.<br>
+        Claude processing? Crab + spinner.<br>
+        Music playing, Claude idle? Album art + waveform.
+      </p>
+    </div>
+
+    <!-- Right: Animated expanded panel -->
+    <div class="demo-card">
+      <div class="demo-label lbl-purple">Expanded — Everything at a Glance</div>
+      <div class="expanded-mock">
+        <!-- Session rows -->
+        <div class="exp-row">
+          <div class="exp-dot" style="background:#e87848"></div>
+          <div class="exp-info">
+            <div class="exp-title">my-project</div>
+            <div class="exp-sub">Processing...</div>
+          </div>
+          <div class="tok-bar"><div class="tok-fill" style="height:25%;background:linear-gradient(to top,rgba(46,204,113,0.5),#2ecc71)"></div></div>
+          <span class="tok-label">23%(200K)</span>
+        </div>
+        <div class="exp-row">
+          <div class="exp-dot" style="background:#2ecc71"></div>
+          <div class="exp-info">
+            <div class="exp-title">Code Review</div>
+            <div class="exp-sub">Ready</div>
+          </div>
+          <div class="tok-bar"><div class="tok-fill" style="height:65%;background:linear-gradient(to top,rgba(255,200,0,0.5),#ffc800)"></div></div>
+          <span class="tok-label">65%(1M)</span>
+        </div>
+
+        <!-- Media -->
+        <div class="media-mock">
+          <div class="media-art"></div>
+          <div class="media-info">
+            <div class="media-title">King of My Heart</div>
+            <div class="media-artist">Bethel Music</div>
+          </div>
+          <div class="media-ctrls">
+            <span>⏮</span><span class="play">⏸</span><span>⏭</span>
+          </div>
+        </div>
+        <div class="prog-bar">
+          <div class="prog-fill"></div>
+          <div class="prog-thumb"></div>
+        </div>
+        <div class="prog-times"><span>1:23</span><span>3:45</span></div>
+
+        <!-- BT -->
+        <div class="bt-header">BLUETOOTH DEVICES</div>
+        <div class="bt-row">
+          <span class="bt-emoji">🎧</span>
+          <span class="bt-name">AirPods Pro</span>
+          <span class="bt-pct">L 85% · R 90%</span>
+        </div>
+        <div class="bt-row">
+          <span class="bt-emoji">🖲️</span>
+          <span class="bt-name">Magic Trackpad</span>
+          <span class="bt-pct">76%</span>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
+<!-- Features -->
 <section class="features">
   <div class="feature">
     <div class="feature-icon">✦</div>
-    <h3>Claude Code Sessions</h3>
-    <p>Monitor multiple sessions with token usage bars. Approve tool permissions and answer questions directly from the notch.</p>
+    <h3>Claude Code</h3>
+    <p>Multi-session monitoring with token % bars. Tool approval and AskUserQuestion from the notch.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">🎵</div>
     <h3>Now Playing</h3>
-    <p>Spotify and Apple Music controls with seekable progress bar. Album art crossfade on track change. Click to open the app.</p>
+    <p>Spotify and Apple Music. Seekable progress bar. Album art crossfade. Click to open.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">🎧</div>
-    <h3>Bluetooth Devices</h3>
-    <p>AirPods L/R/Case battery breakdown. Headphones, trackpad, keyboard support. Brief animation when devices connect.</p>
+    <h3>Bluetooth</h3>
+    <p>AirPods L/R/Case battery. Headphones, trackpad, keyboard. Pairing animation.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">✨</div>
     <h3>Smart Priority</h3>
-    <p>Claude takes the notch when processing. Music shows when idle. Expand to see everything stacked. Dynamic panel height.</p>
+    <p>Claude when active, music when idle. Dynamic height. Waveform, blur, glow.</p>
   </div>
 </section>
 
-<section class="install-block">
-  <h2>Install</h2>
-  <pre><span class="comment"># Download the DMG from GitHub Releases</span>
-<span class="comment"># Or build from source:</span>
+<!-- Install + Requirements side by side -->
+<div class="bottom-grid">
+  <div>
+    <h2>Install</h2>
+    <pre><span class="comment"># Download the DMG from GitHub Releases, or build from source:</span>
 <span class="cmd">git clone</span> https://github.com/DKJTR/JClaude-Island.git
 <span class="cmd">cd</span> JClaude-Island
 <span class="cmd">xcodebuild</span> -scheme ClaudeIsland -configuration Release build \
   -destination "platform=macOS,arch=arm64" CODE_SIGN_IDENTITY="-"</pre>
-</section>
-
-<section class="requirements">
-  <h2>Requirements</h2>
-  <ul class="req-list">
-    <li>macOS 15.0+ with a notched MacBook</li>
-    <li>Claude Code CLI (for AI session monitoring)</li>
-    <li>Spotify or Apple Music (for media controls)</li>
-  </ul>
-</section>
+  </div>
+  <div>
+    <h2>Requirements</h2>
+    <ul class="req-list">
+      <li>macOS 15.0+ with a notched MacBook</li>
+      <li>Claude Code CLI</li>
+      <li>Spotify or Apple Music</li>
+      <li>Xcode (build from source only)</li>
+    </ul>
+  </div>
+</div>
 
 <footer>
   <p>Built on <a href="https://github.com/farouqaldori/claude-island">Claude Island</a> by Farouq Aldori. Apache 2.0 License.</p>
   <p style="margin-top:8px">Made by <a href="https://aipm-cychien.work">Jack Chien</a></p>
 </footer>
 
+<script>
+// Animate notch switching between Claude and Music modes
+(function() {
+  const claude = document.getElementById('notch-claude');
+  const music = document.getElementById('notch-music');
+  const label = document.getElementById('notch-label');
+  if (!claude || !music) return;
+  let showClaude = true;
+  setInterval(() => {
+    showClaude = !showClaude;
+    claude.classList.toggle('hidden', !showClaude);
+    music.classList.toggle('hidden', showClaude);
+    if (showClaude) {
+      label.textContent = 'Claude takes priority when active';
+      label.className = 'demo-label lbl-orange';
+    } else {
+      label.textContent = 'Music shows when Claude is idle';
+      label.className = 'demo-label lbl-green';
+    }
+  }, 3000);
+})();
+</script>
 </body>
 </html>
