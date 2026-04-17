@@ -449,8 +449,17 @@ struct NotchView: View {
                         CompactMediaRow(mediaService: mediaService)
                     }
 
+                    // Bluetooth section (if devices connected)
+                    if !bluetoothService.connectedDevices.isEmpty {
+                        Divider()
+                            .background(Color.white.opacity(0.08))
+                            .padding(.vertical, 4)
+
+                        BluetoothView(bluetoothService: bluetoothService)
+                    }
+
                     // Nothing active
-                    if sessionMonitor.instances.isEmpty && !hasMediaActivity {
+                    if sessionMonitor.instances.isEmpty && !hasMediaActivity && bluetoothService.connectedDevices.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 20, weight: .light))

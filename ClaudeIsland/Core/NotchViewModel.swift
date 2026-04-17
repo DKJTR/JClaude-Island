@@ -87,11 +87,13 @@ class NotchViewModel: ObservableObject {
                     + claudeDirSelector.expandedPickerHeight
             )
         case .instances:
-            // Extra height when media is playing (stacked layout)
-            let mediaExtra: CGFloat = MediaRemoteService.shared.isActive ? 70 : 0
+            // Extra height for stacked sections
+            let mediaExtra: CGFloat = MediaRemoteService.shared.isActive ? 90 : 0
+            let btDevices = BluetoothService.shared.connectedDevices.count
+            let btExtra: CGFloat = btDevices > 0 ? CGFloat(40 + btDevices * 48) : 0
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
-                height: 320 + mediaExtra
+                height: 320 + mediaExtra + btExtra
             )
         case .media:
             return CGSize(
