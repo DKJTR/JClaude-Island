@@ -61,7 +61,7 @@ struct ClaudeInstancesView: View {
     /// Approval requests share priority with processing to maintain stable ordering
     private func phasePriority(_ phase: SessionPhase) -> Int {
         switch phase {
-        case .waitingForApproval, .processing, .compacting: return 0
+        case .waitingForApproval, .waitingForAnswer, .processing, .compacting: return 0
         case .waitingForInput: return 1
         case .idle, .ended: return 2
         }
@@ -206,6 +206,8 @@ struct InstanceRow: View {
             return "Ready"
         case .waitingForApproval:
             return "Waiting for approval"
+        case .waitingForAnswer(let ctx):
+            return ctx.questions.count > 1 ? "Question (\(ctx.questions.count))" : "Question"
         case .idle:
             return "Idle"
         case .ended:
@@ -424,6 +426,10 @@ struct InstanceRow: View {
                 .onReceive(spinnerTimer) { _ in
                     spinnerPhase = (spinnerPhase + 1) % spinnerSymbols.count
                 }
+        case .waitingForAnswer:
+            Image(systemName: "questionmark.circle.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(TerminalColors.amber)
         case .waitingForInput:
             Circle()
                 .fill(TerminalColors.green)

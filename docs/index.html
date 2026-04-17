@@ -265,17 +265,103 @@ footer {
 }
 footer a { color: rgba(255,255,255,0.5); }
 
-/* Multi-step animation */
-.demo-step { display: none; animation: stepFadeIn 0.4s ease; }
-.demo-step.active { display: block; }
-@keyframes stepFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.q-option {
-  padding: 5px 12px; border-radius: 10px; font-size: 10px; font-weight: 500;
-  background: rgba(0,188,212,0.15); color: rgba(255,255,255,0.8);
-  cursor: default; transition: all 0.2s;
+/* Cute Claude crab (matches the app) */
+.crab { display: inline-block; vertical-align: middle; color: #d97757; }
+.crab .leg { transform-box: fill-box; transform-origin: top; }
+.crab.walking .leg-a { animation: legA 0.5s ease-in-out infinite; }
+.crab.walking .leg-b { animation: legB 0.5s ease-in-out infinite; }
+@keyframes legA { 0%,100% { transform: scaleY(1.23); } 50% { transform: scaleY(0.77); } }
+@keyframes legB { 0%,100% { transform: scaleY(0.77); } 50% { transform: scaleY(1.23); } }
+
+/* Animated stage — single morphing notch with virtual cursor */
+.stage {
+  position: relative; height: 260px;
+  display: flex; flex-direction: column; align-items: center;
+  margin-top: 4px;
 }
-.q-option.picked { background: #2ecc71; color: #0d0b12; }
-.demo-hint { font-size: 12px; color: rgba(255,255,255,0.25); margin-top: 16px; line-height: 1.6; }
+.notch {
+  position: relative; background: #000;
+  border-radius: 0 0 22px 22px;
+  width: 240px; height: 36px;
+  overflow: hidden;
+  transition:
+    width 0.6s cubic-bezier(0.32, 0.72, 0.24, 1),
+    height 0.6s cubic-bezier(0.32, 0.72, 0.24, 1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+}
+.notch.expanded { width: 340px; height: 210px; }
+
+/* Closed-pill content layers (cross-fade) */
+.pill-layer {
+  position: absolute; top: 0; left: 0; right: 0; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; padding: 0 14px;
+  opacity: 0; transition: opacity 0.35s ease;
+}
+.notch:not(.expanded) .pill-layer.visible { opacity: 1; }
+
+.pill-spinner {
+  color: #e87848; font-size: 13px; font-weight: bold;
+  animation: pulseDim 1.2s ease-in-out infinite;
+}
+@keyframes pulseDim { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.pill-divider { color: rgba(255,255,255,0.18); font-size: 11px; letter-spacing: -1px; }
+.pill-art {
+  width: 22px; height: 22px; border-radius: 5px;
+  background: linear-gradient(135deg, #8b5a3a, #c97b4a); flex-shrink: 0;
+}
+.pill-text { color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 500; max-width: 140px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Expanded content */
+.expanded-layer {
+  position: absolute; inset: 0;
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.expanded-layer.visible { opacity: 1; transition-delay: 0.2s; }
+.q-header {
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.q-title { font-size: 12px; font-weight: 500; }
+.q-tag { font-size: 10px; color: #e87848; }
+.q-tokens { font-size: 9px; color: rgba(255,255,255,0.3); font-family: monospace; }
+.q-text { font-size: 11px; color: rgba(255,255,255,0.75); line-height: 1.5; }
+.q-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.q-option {
+  padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 500;
+  background: rgba(0,188,212,0.14); color: rgba(255,255,255,0.8);
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+.q-option.hover { background: rgba(0,188,212,0.32); transform: translateY(-1px); }
+.q-option.picked { background: #2ecc71; color: #0d0b12; transform: scale(1.04); }
+
+/* Virtual mouse cursor */
+.cursor {
+  position: absolute; top: 0; left: 0;
+  width: 18px; height: 22px; pointer-events: none; z-index: 10;
+  opacity: 0;
+  transform: translate(var(--x, 280px), var(--y, 220px)) scale(var(--s, 1));
+  transition:
+    transform 1s cubic-bezier(0.45, 0.05, 0.25, 1),
+    opacity 0.3s ease;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+}
+.cursor.visible { opacity: 1; }
+.cursor.clicking { --s: 0.82; transition: transform 0.12s ease; }
+.click-ripple {
+  position: absolute; width: 22px; height: 22px;
+  border-radius: 50%; border: 2px solid #2ecc71;
+  pointer-events: none; opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+}
+.click-ripple.firing { animation: ripple 0.55s ease-out; }
+@keyframes ripple {
+  0%   { opacity: 0.85; transform: translate(-50%, -50%) scale(0.4); }
+  100% { opacity: 0;    transform: translate(-50%, -50%) scale(2.4); }
+}
 </style>
 </head>
 <body>
@@ -318,78 +404,93 @@ footer a { color: rgba(255,255,255,0.5); }
   <p class="subtitle">The notch adapts to what you're doing. Claude processing? Music playing? Both? It just works.</p>
 
   <div class="demo-grid">
-    <!-- Left: Multi-step animated demo -->
+    <!-- Left: Smooth interactive notch demo -->
     <div class="demo-card">
-      <div id="step-label" class="demo-label lbl-orange" style="transition:all 0.3s">Claude is working...</div>
+      <div id="step-label" class="demo-label lbl-orange">Claude is working...</div>
 
-      <!-- Step 1: Closed notch - Claude processing -->
-      <div class="demo-step active" data-step="1">
-        <div class="notch-pill" style="justify-content:center;gap:12px">
-          <span class="claude-icon" style="font-size:14px">✦</span>
-          <span style="color:rgba(255,255,255,0.15);font-size:11px">━━━━━━━━━━━━━━━━━━━━━━</span>
-          <span class="spinner" style="font-size:13px">✳</span>
-        </div>
-      </div>
-
-      <!-- Step 2: Closed notch - Music takes over -->
-      <div class="demo-step" data-step="2">
-        <div class="notch-pill" style="gap:8px">
-          <div class="art" style="width:22px;height:22px;border-radius:5px"></div>
-          <span class="text" style="font-size:11px">Bethel Music — King of My Heart</span>
-          <span class="gap"></span>
-          <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
-        </div>
-      </div>
-
-      <!-- Step 3: Expanded - Claude asks a question -->
-      <div class="demo-step" data-step="3">
-        <div style="background:#161320;border:1px solid rgba(255,255,255,0.06);border-radius:14px;overflow:hidden">
-          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">
-            <span style="color:#e87848;font-size:12px;font-weight:bold">✳</span>
-            <div style="flex:1">
-              <div style="font-size:12px;font-weight:500">my-project</div>
-              <div style="font-size:10px;color:#e87848">Question</div>
-            </div>
-            <span style="font-size:9px;color:rgba(255,255,255,0.3);font-family:monospace">23%(200K)</span>
+      <div class="stage">
+        <div class="notch" id="notch">
+          <!-- Closed-pill: Claude state -->
+          <div class="pill-layer visible" id="claudeLayer">
+            <svg class="crab walking" viewBox="0 0 66 52" width="14" height="11" aria-hidden="true">
+              <g fill="currentColor">
+                <rect x="0" y="13" width="6" height="13"/>
+                <rect x="60" y="13" width="6" height="13"/>
+                <rect x="6" y="0" width="54" height="39"/>
+                <rect class="leg leg-a" x="6"  y="39" width="6" height="13"/>
+                <rect class="leg leg-b" x="18" y="39" width="6" height="13"/>
+                <rect class="leg leg-a" x="42" y="39" width="6" height="13"/>
+                <rect class="leg leg-b" x="54" y="39" width="6" height="13"/>
+              </g>
+              <rect x="12" y="13" width="6" height="6.5" fill="#000"/>
+              <rect x="48" y="13" width="6" height="6.5" fill="#000"/>
+            </svg>
+            <span class="pill-divider">━━━━━━━━━━━━━━━━━</span>
+            <span class="pill-spinner">✳</span>
           </div>
-          <div style="padding:10px 14px;font-size:11px;color:rgba(255,255,255,0.7);line-height:1.5">
-            Should I create separate PRs for the refactor and the new feature?
-          </div>
-          <div style="display:flex;gap:6px;padding:4px 14px 12px;flex-wrap:wrap">
-            <span class="q-option" id="opt1">Yes, separate PRs</span>
-            <span class="q-option" id="opt2">No, bundle them</span>
-            <span class="q-option" id="opt3">Let me think</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- Step 4: Answer sent, Claude resumes -->
-      <div class="demo-step" data-step="4">
-        <div style="background:#161320;border:1px solid rgba(255,255,255,0.06);border-radius:14px;overflow:hidden">
-          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">
-            <span class="spinner" style="font-size:12px">✳</span>
-            <div style="flex:1">
-              <div style="font-size:12px;font-weight:500">my-project</div>
-              <div style="font-size:10px;color:rgba(255,255,255,0.35)">Processing...</div>
+          <!-- Closed-pill: Music state -->
+          <div class="pill-layer" id="musicLayer">
+            <div class="pill-art"></div>
+            <span class="pill-text">Bethel Music — King of My Heart</span>
+            <div class="waveform">
+              <span></span><span></span><span></span><span></span><span></span>
             </div>
           </div>
-          <div style="padding:10px 14px;font-size:11px;color:#2ecc71">
-            ✓ Answered: "Yes, separate PRs"
+
+          <!-- Expanded: Question -->
+          <div class="expanded-layer" id="questionLayer">
+            <div class="q-header">
+              <svg class="crab walking" viewBox="0 0 66 52" width="14" height="11" aria-hidden="true">
+                <g fill="currentColor">
+                  <rect x="0" y="13" width="6" height="13"/>
+                  <rect x="60" y="13" width="6" height="13"/>
+                  <rect x="6" y="0" width="54" height="39"/>
+                  <rect class="leg leg-a" x="6"  y="39" width="6" height="13"/>
+                  <rect class="leg leg-b" x="18" y="39" width="6" height="13"/>
+                  <rect class="leg leg-a" x="42" y="39" width="6" height="13"/>
+                  <rect class="leg leg-b" x="54" y="39" width="6" height="13"/>
+                </g>
+                <rect x="12" y="13" width="6" height="6.5" fill="#000"/>
+                <rect x="48" y="13" width="6" height="6.5" fill="#000"/>
+              </svg>
+              <div style="flex:1">
+                <div class="q-title">my-project</div>
+                <div class="q-tag">Question</div>
+              </div>
+              <span class="q-tokens">23%(200K)</span>
+            </div>
+            <div class="q-text">Should I create separate PRs for the refactor and the new feature?</div>
+            <div class="q-options">
+              <span class="q-option" id="opt1">Yes, separate PRs</span>
+              <span class="q-option">No, bundle them</span>
+              <span class="q-option">Let me think</span>
+            </div>
+          </div>
+
+          <!-- Expanded: Answered -->
+          <div class="expanded-layer" id="answeredLayer">
+            <div class="q-header">
+              <span class="pill-spinner" style="font-size:12px">✳</span>
+              <div style="flex:1">
+                <div class="q-title">my-project</div>
+                <div class="q-tag" style="color:rgba(255,255,255,0.4)">Processing...</div>
+              </div>
+              <span class="q-tokens">24%(200K)</span>
+            </div>
+            <div style="font-size:11px;color:#2ecc71;padding-top:4px">✓ Answered: "Yes, separate PRs"</div>
           </div>
         </div>
-      </div>
 
-      <!-- Step 5: Collapses, music returns -->
-      <div class="demo-step" data-step="5">
-        <div class="notch-pill" style="gap:8px">
-          <div class="art" style="width:22px;height:22px;border-radius:5px"></div>
-          <span class="text" style="font-size:11px">Bethel Music — King of My Heart</span>
-          <span class="gap"></span>
-          <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
+        <!-- Virtual mouse cursor -->
+        <div class="cursor" id="cursor">
+          <svg viewBox="0 0 28 32" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 3 L5 24 L11 19 L14 27 L18 25 L15 17 L23 17 Z"
+                  fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
         </div>
+        <div class="click-ripple" id="ripple"></div>
       </div>
-
-      <p class="demo-hint" id="step-hint" style="transition:opacity 0.3s"></p>
     </div>
 
     <!-- Right: Expanded panel mockup -->
@@ -496,56 +597,129 @@ footer a { color: rgba(255,255,255,0.5); }
 </footer>
 
 <script>
-// Multi-step demo animation
+// Smooth interactive demo: cursor moves, notch morphs, option click ripples
 (function() {
-  const steps = document.querySelectorAll('.demo-step');
-  const label = document.getElementById('step-label');
-  const hint = document.getElementById('step-hint');
-  if (!steps.length) return;
+  const notch         = document.getElementById('notch');
+  const cursor        = document.getElementById('cursor');
+  const ripple        = document.getElementById('ripple');
+  const claudeLayer   = document.getElementById('claudeLayer');
+  const musicLayer    = document.getElementById('musicLayer');
+  const questionLayer = document.getElementById('questionLayer');
+  const answeredLayer = document.getElementById('answeredLayer');
+  const opt1          = document.getElementById('opt1');
+  const label         = document.getElementById('step-label');
+  if (!notch) return;
 
-  const scenes = [
-    { step: 1, dur: 3000, label: 'Claude is working...',              lbl: 'lbl-orange',
-      hint: '' },
-    { step: 2, dur: 3000, label: 'Your music takes over',             lbl: 'lbl-green',
-      hint: '' },
-    { step: 3, dur: 3500, label: 'Claude needs your input',           lbl: 'lbl-cyan',
-      hint: '' },
-    { step: 4, dur: 2500, label: 'Answered. Back to work.',           lbl: 'lbl-green',
-      hint: '' },
-    { step: 5, dur: 3000, label: 'Music is back',                     lbl: 'lbl-green',
-      hint: '' },
-  ];
+  const stageEl = notch.parentElement;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const moveCursor = (x, y) => {
+    cursor.style.setProperty('--x', x + 'px');
+    cursor.style.setProperty('--y', y + 'px');
+  };
+  const setLabel = (text, cls) => {
+    label.textContent = text;
+    label.className = 'demo-label ' + cls;
+  };
+  // Position relative to the stage's top-left
+  const relTo = (el) => {
+    const s = stageEl.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left - s.left, y: r.top - s.top,
+      cx: r.left - s.left + r.width / 2,
+      cy: r.top  - s.top  + r.height / 2,
+      w: r.width, h: r.height
+    };
+  };
+  const offStagePos = () => {
+    const s = stageEl.getBoundingClientRect();
+    return { x: s.width - 20, y: s.height - 20 };
+  };
 
-  let idx = 0;
-
-  function show(i) {
-    steps.forEach(s => s.classList.remove('active'));
-    const scene = scenes[i];
-    const el = document.querySelector('[data-step="' + scene.step + '"]');
-    if (el) el.classList.add('active');
-    label.textContent = scene.label;
-    label.className = 'demo-label ' + scene.lbl;
-    hint.textContent = scene.hint;
-
-    // Animate option pick on step 3->4 transition
-    if (scene.step === 3) {
-      const opt = document.getElementById('opt1');
-      if (opt) {
-        setTimeout(() => { opt.classList.add('picked'); }, 2000);
-        setTimeout(() => { opt.classList.remove('picked'); }, 3400);
-      }
-    }
+  function reset() {
+    notch.classList.remove('expanded');
+    claudeLayer.classList.add('visible');
+    musicLayer.classList.remove('visible');
+    questionLayer.classList.remove('visible');
+    answeredLayer.classList.remove('visible');
+    opt1.classList.remove('hover', 'picked');
+    cursor.classList.remove('visible', 'clicking');
+    const off = offStagePos();
+    moveCursor(off.x, off.y);
   }
 
-  function advance() {
-    show(idx);
-    setTimeout(() => {
-      idx = (idx + 1) % scenes.length;
-      advance();
-    }, scenes[idx].dur);
+  async function loop() {
+    reset();
+
+    // 1. Claude working
+    setLabel('Claude is working...', 'lbl-orange');
+    await wait(2800);
+
+    // 2. Music takes over (cross-fade in same closed pill)
+    setLabel('Your music takes over', 'lbl-green');
+    claudeLayer.classList.remove('visible');
+    musicLayer.classList.add('visible');
+    await wait(2400);
+
+    // 3. Cursor enters and approaches the notch
+    setLabel('Claude needs your input', 'lbl-cyan');
+    const off = offStagePos();
+    moveCursor(off.x, off.y);
+    cursor.classList.add('visible');
+    await wait(50);
+    const nc = relTo(notch);
+    moveCursor(nc.cx - 8, nc.y + nc.h - 8);  // hover just below the closed pill
+    await wait(950);
+
+    // 4. Notch expands smoothly, question appears
+    notch.classList.add('expanded');
+    musicLayer.classList.remove('visible');
+    await wait(150);
+    questionLayer.classList.add('visible');
+    await wait(900);
+
+    // 5. Cursor moves down toward the first option
+    const op = relTo(opt1);
+    moveCursor(op.cx - 8, op.cy - 6);
+    await wait(950);
+    opt1.classList.add('hover');
+    await wait(450);
+
+    // 6. Click: ripple + cursor squish + option flips to "picked"
+    const op2 = relTo(opt1);
+    ripple.style.left = op2.cx + 'px';
+    ripple.style.top  = op2.cy + 'px';
+    ripple.classList.remove('firing');
+    void ripple.offsetWidth;  // restart animation
+    ripple.classList.add('firing');
+    cursor.classList.add('clicking');
+    await wait(140);
+    cursor.classList.remove('clicking');
+    opt1.classList.remove('hover');
+    opt1.classList.add('picked');
+    await wait(900);
+
+    // 7. Show "Answered" state, cursor exits
+    setLabel('Answered. Back to work.', 'lbl-green');
+    questionLayer.classList.remove('visible');
+    answeredLayer.classList.add('visible');
+    const off2 = offStagePos();
+    moveCursor(off2.x, off2.y);
+    cursor.classList.remove('visible');
+    await wait(1700);
+
+    // 8. Notch collapses, music returns
+    setLabel('Music is back', 'lbl-green');
+    answeredLayer.classList.remove('visible');
+    notch.classList.remove('expanded');
+    await wait(200);
+    musicLayer.classList.add('visible');
+    await wait(2400);
   }
 
-  advance();
+  (async function run() {
+    while (true) await loop();
+  })();
 })();
 </script>
 </body>

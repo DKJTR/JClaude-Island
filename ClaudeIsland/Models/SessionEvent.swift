@@ -27,6 +27,15 @@ enum SessionEvent: Sendable {
     /// Permission socket failed (connection died before response)
     case permissionSocketFailed(sessionId: String, toolUseId: String)
 
+    // MARK: - Question Events (AskUserQuestion)
+
+    /// User answered an AskUserQuestion via the island
+    /// `answers` is keyed by question header → selected option label
+    case questionAnswered(sessionId: String, toolUseId: String, answers: [String: String])
+
+    /// Question socket failed (connection died before user answered)
+    case questionSocketFailed(sessionId: String, toolUseId: String)
+
     // MARK: - File Events (from ConversationParser)
 
     /// JSONL file was updated with new content
@@ -134,6 +143,17 @@ extension HookEvent {
             return .compacting
         }
 
+        // AskUserQuestion intercepted by island → waitingForAnswer
+        if event == "PreToolUse",
+           tool == "AskUserQuestion",
+           status == "waiting_for_answer" {
+            if let ctx = QuestionContext.parse(toolUseId: toolUseId ?? "", toolInput: toolInput) {
+                return .waitingForAnswer(ctx)
+            }
+            // Malformed question — fall back to processing rather than into the permission branch
+            return .processing
+        }
+
         // Permission request creates waitingForApproval state
         if expectsResponse, let tool = tool {
             return .waitingForApproval(PermissionContext(
@@ -191,6 +211,10 @@ extension SessionEvent: CustomStringConvertible {
             return "permissionDenied(session: \(sessionId.prefix(8)), tool: \(toolUseId.prefix(12)))"
         case .permissionSocketFailed(let sessionId, let toolUseId):
             return "permissionSocketFailed(session: \(sessionId.prefix(8)), tool: \(toolUseId.prefix(12)))"
+        case .questionAnswered(let sessionId, let toolUseId, let answers):
+            return "questionAnswered(session: \(sessionId.prefix(8)), tool: \(toolUseId.prefix(12)), answers: \(answers.count))"
+        case .questionSocketFailed(let sessionId, let toolUseId):
+            return "questionSocketFailed(session: \(sessionId.prefix(8)), tool: \(toolUseId.prefix(12)))"
         case .fileUpdated(let payload):
             return "fileUpdated(session: \(payload.sessionId.prefix(8)), messages: \(payload.messages.count))"
         case .interruptDetected(let sessionId):

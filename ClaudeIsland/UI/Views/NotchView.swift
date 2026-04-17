@@ -47,6 +47,11 @@ struct NotchView: View {
         sessionMonitor.instances.contains { $0.phase.isWaitingForApproval }
     }
 
+    /// Whether any Claude session has a pending AskUserQuestion
+    private var hasPendingQuestion: Bool {
+        sessionMonitor.instances.contains { $0.phase.isWaitingForAnswer }
+    }
+
     /// Whether any Claude session is waiting for user input (done/ready state) within the display window
     private var hasWaitingForInput: Bool {
         let now = Date()
@@ -73,12 +78,12 @@ struct NotchView: View {
 
     /// Whether Claude is actively working (not just the 30s cooldown)
     private var hasClaudeActivity: Bool {
-        isAnyProcessing || hasPendingPermission
+        isAnyProcessing || hasPendingPermission || hasPendingQuestion
     }
 
     /// Whether Claude has any visible state (including 30s "done" checkmark)
     private var hasClaudeVisibleState: Bool {
-        isAnyProcessing || hasPendingPermission || hasWaitingForInput
+        isAnyProcessing || hasPendingPermission || hasPendingQuestion || hasWaitingForInput
     }
 
     /// Whether media is playing
@@ -93,7 +98,7 @@ struct NotchView: View {
 
     /// Closed notch expansion: show Claude if actively working, else show media
     private var expansionWidth: CGFloat {
-        let permissionIndicatorWidth: CGFloat = hasPendingPermission ? 18 : 0
+        let permissionIndicatorWidth: CGFloat = (hasPendingPermission || hasPendingQuestion) ? 18 : 0
         let baseWidth = 2 * max(0, closedNotchSize.height - 12) + 20
 
         // Claude takes priority only when actively working
@@ -116,9 +121,9 @@ struct NotchView: View {
     }
 
     /// Whether closed state shows Claude (true) or media (false)
-    /// Claude takes over only when actively processing/approval, not during the done-checkmark cooldown
+    /// Claude takes over only when actively processing/approval/question, not during the done-checkmark cooldown
     private var closedShowsClaude: Bool {
-        isAnyProcessing || hasPendingPermission
+        isAnyProcessing || hasPendingPermission || hasPendingQuestion
     }
 
     /// Glow color for hover: green when media is active, orange/prompt when Claude is active, dim white otherwise
@@ -221,6 +226,7 @@ struct NotchView: View {
                     .animation(openAnimation, value: notchSize) // Animate container size changes between content types
                     .animation(.smooth, value: expansionWidth)
                     .animation(.smooth, value: hasPendingPermission)
+                    .animation(.smooth, value: hasPendingQuestion)
                     .animation(.smooth, value: hasWaitingForInput)
                     .animation(.smooth, value: hasMediaActivity)
                     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isBouncing)
@@ -282,7 +288,7 @@ struct NotchView: View {
     // MARK: - Notch Layout
 
     private var isProcessing: Bool {
-        isAnyProcessing || hasPendingPermission
+        isAnyProcessing || hasPendingPermission || hasPendingQuestion
     }
 
     /// Whether to show the expanded closed state
@@ -323,7 +329,7 @@ struct NotchView: View {
                 if hasClaudeVisibleState {
                     HStack(spacing: 4) {
                         ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                        if hasPendingPermission {
+                        if hasPendingPermission || hasPendingQuestion {
                             PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
                         }
                     }
@@ -333,7 +339,7 @@ struct NotchView: View {
                 openedHeaderContent
 
                 if hasClaudeVisibleState {
-                    if isProcessing || hasPendingPermission {
+                    if isProcessing || hasPendingPermission || hasPendingQuestion {
                         ProcessingSpinner()
                             .frame(width: 20)
                     } else if hasWaitingForInput {
@@ -345,17 +351,17 @@ struct NotchView: View {
                 // CLOSED — Claude mode: crab left, spinner right
                 HStack(spacing: 4) {
                     ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                    if hasPendingPermission {
+                    if hasPendingPermission || hasPendingQuestion {
                         PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
                     }
                 }
-                .frame(width: sideWidth + (hasPendingPermission ? 18 : 0))
+                .frame(width: sideWidth + ((hasPendingPermission || hasPendingQuestion) ? 18 : 0))
 
                 Rectangle()
                     .fill(.black)
                     .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top + (isBouncing ? 16 : 0))
 
-                if isProcessing || hasPendingPermission {
+                if isProcessing || hasPendingPermission || hasPendingQuestion {
                     ProcessingSpinner()
                         .frame(width: sideWidth)
                         .padding(.trailing, 4)
@@ -633,6 +639,22 @@ struct NotchView: View {
            viewModel.status == .closed &&
            !TerminalVisibilityDetector.isTerminalVisibleOnCurrentSpace() {
             viewModel.notchOpen(reason: .notification)
+        }
+
+        // Play alert sound when a NEW permission request or AskUserQuestion arrives,
+        // matching the existing waitingForInput behavior. Only ring for sessions whose
+        // host terminal isn't visible — same heuristic so we don't ping when the user
+        // is already looking at the terminal.
+        if !newPendingIds.isEmpty {
+            let newlyPending = sessions.filter { newPendingIds.contains($0.stableId) }
+            if let soundName = AppSettings.notificationSound.soundName {
+                Task {
+                    let shouldPlay = await shouldPlayNotificationSound(for: newlyPending)
+                    if shouldPlay {
+                        await MainActor.run { NSSound(named: soundName)?.play() }
+                    }
+                }
+            }
         }
 
         previousPendingIds = currentIds

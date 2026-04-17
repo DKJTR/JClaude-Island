@@ -65,6 +65,12 @@ struct HookEvent: Codable, Sendable {
                 toolInput: toolInput,
                 receivedAt: Date()
             ))
+        case "waiting_for_answer":
+            // Full QuestionContext is parsed by SessionStore via determinePhase()
+            if let ctx = QuestionContext.parse(toolUseId: toolUseId ?? "", toolInput: toolInput) {
+                return .waitingForAnswer(ctx)
+            }
+            return .processing
         case "waiting_for_input":
             return .waitingForInput
         case "running_tool", "processing", "starting":
@@ -76,9 +82,10 @@ struct HookEvent: Codable, Sendable {
         }
     }
 
-    /// Whether this event expects a response (permission request)
+    /// Whether this event expects a response (permission request OR question answer)
     nonisolated var expectsResponse: Bool {
-        event == "PermissionRequest" && status == "waiting_for_approval"
+        (event == "PermissionRequest" && status == "waiting_for_approval")
+        || (event == "PreToolUse" && tool == "AskUserQuestion" && status == "waiting_for_answer")
     }
 }
 
@@ -216,6 +223,14 @@ class HookSocketServer {
     func respondToPermission(toolUseId: String, decision: String, reason: String? = nil) {
         queue.async { [weak self] in
             self?.sendPermissionResponse(toolUseId: toolUseId, decision: decision, reason: reason)
+        }
+    }
+
+    /// Respond to a pending AskUserQuestion request with the user's answers
+    /// `answers` is keyed by question header → selected option label (or array for multi-select)
+    func respondToQuestion(toolUseId: String, answers: [String: Any]) {
+        queue.async { [weak self] in
+            self?.sendQuestionResponse(toolUseId: toolUseId, answers: answers)
         }
     }
 
@@ -498,6 +513,43 @@ class HookSocketServer {
                 logger.error("Write failed with errno: \(errno)")
             } else {
                 logger.debug("Write succeeded: \(result) bytes")
+            }
+        }
+
+        close(pending.clientSocket)
+    }
+
+    private func sendQuestionResponse(toolUseId: String, answers: [String: Any]) {
+        permissionsLock.lock()
+        guard let pending = pendingPermissions.removeValue(forKey: toolUseId) else {
+            permissionsLock.unlock()
+            logger.debug("No pending question for toolUseId: \(toolUseId.prefix(12), privacy: .public)")
+            return
+        }
+        permissionsLock.unlock()
+
+        let payload: [String: Any] = ["answers": answers]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [])
+        else {
+            logger.error("Failed to serialize question answers")
+            close(pending.clientSocket)
+            return
+        }
+
+        let age = Date().timeIntervalSince(pending.receivedAt)
+        logger.info("Sending question answer for \(pending.sessionId.prefix(8), privacy: .public) tool:\(toolUseId.prefix(12), privacy: .public) (age: \(String(format: "%.1f", age), privacy: .public)s)")
+
+        data.withUnsafeBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else {
+                logger.error("Failed to get data buffer address")
+                return
+            }
+            let result = write(pending.clientSocket, baseAddress, data.count)
+            if result < 0 {
+                logger.error("Question answer write failed with errno: \(errno)")
+            } else {
+                logger.debug("Question answer write succeeded: \(result) bytes")
             }
         }
 

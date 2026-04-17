@@ -51,6 +51,16 @@ struct ChatView: View {
         session.phase.approvalToolName
     }
 
+    /// Whether Claude is waiting for an AskUserQuestion answer
+    private var isWaitingForAnswer: Bool {
+        session.phase.isWaitingForAnswer
+    }
+
+    /// Extract the QuestionContext if waiting for answer
+    private var questionContext: QuestionContext? {
+        session.phase.questionContext
+    }
+
     
     var body: some View {
         ZStack {
@@ -67,10 +77,20 @@ struct ChatView: View {
                     messageList
                 }
 
-                // Approval bar, interactive prompt, or Input bar
-                if let tool = approvalTool {
+                // Question picker, approval bar, interactive prompt, or Input bar
+                if let qctx = questionContext {
+                    ChatQuestionBar(
+                        context: qctx,
+                        onSubmit: { answers in submitQuestionAnswers(answers) },
+                        onCancel: { cancelQuestion() }
+                    )
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .bottom)),
+                        removal: .opacity
+                    ))
+                } else if let tool = approvalTool {
                     if tool == "AskUserQuestion" {
-                        // Interactive tools - show prompt to answer in terminal
+                        // Fallback: hook didn't intercept (e.g., island not running) → guide to terminal
                         interactivePromptBar
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .move(edge: .bottom)),
@@ -148,6 +168,8 @@ struct ChatView: View {
                updated != session {
                 // Check if permission was just accepted (transition from waitingForApproval to processing)
                 let wasWaiting = isWaitingForApproval
+                let pidChanged = updated.pid != session.pid
+                let tmuxChanged = updated.isInTmux != session.isInTmux
                 session = updated
                 let isNowProcessing = updated.phase == .processing
 
@@ -157,7 +179,15 @@ struct ChatView: View {
                         shouldScrollToBottom = true
                     }
                 }
+
+                // Re-detect host whenever pid/tmux state changes
+                if pidChanged || tmuxChanged {
+                    Task { await refreshHostDetection() }
+                }
             }
+        }
+        .task {
+            await refreshHostDetection()
         }
         .onChange(of: canSendMessages) { _, canSend in
             // Auto-focus input when tmux messaging becomes available
@@ -353,14 +383,26 @@ struct ChatView: View {
 
     // MARK: - Input Bar
 
-    /// Can send messages only if session is in tmux
+    @State private var detectedHost: TerminalHost = .unknown
+
+    /// Can send messages whenever we detected a known host (tmux, Terminal.app, iTerm2, Cursor, …)
     private var canSendMessages: Bool {
-        session.isInTmux && session.tty != nil
+        detectedHost.canSend
+    }
+
+    private var inputPlaceholder: String {
+        switch detectedHost {
+        case .tmux: return "Message Claude (tmux)…"
+        case .iTerm2: return "Message Claude (iTerm2)…"
+        case .terminalApp: return "Message Claude (Terminal)…"
+        case .bundleApp(_, let name, _): return "Message Claude (\(name))…"
+        case .unknown: return "No Claude host detected"
+        }
     }
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            TextField(canSendMessages ? "Message Claude..." : "Open Claude Code in tmux to enable messaging", text: $inputText)
+            TextField(inputPlaceholder, text: $inputText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundColor(canSendMessages ? .white : .white.opacity(0.4))
@@ -462,6 +504,15 @@ struct ChatView: View {
         sessionMonitor.denyPermission(sessionId: sessionId, reason: nil)
     }
 
+    private func submitQuestionAnswers(_ answers: [String: String]) {
+        sessionMonitor.answerQuestion(sessionId: sessionId, answers: answers)
+    }
+
+    private func cancelQuestion() {
+        // Empty answers → hook will fall through to terminal picker
+        sessionMonitor.answerQuestion(sessionId: sessionId, answers: [:])
+    }
+
     private func sendMessage() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -478,13 +529,32 @@ struct ChatView: View {
         }
     }
 
-    private func sendToSession(_ text: String) async {
-        guard session.isInTmux else { return }
-        guard let tty = session.tty else { return }
+    private func refreshHostDetection() async {
+        let host = await TerminalRouter.shared.detectHost(
+            forSessionPid: session.pid,
+            isInTmux: session.isInTmux
+        )
+        await MainActor.run { self.detectedHost = host }
+    }
 
-        if let target = await findTmuxTarget(tty: tty) {
-            _ = await ToolApprovalHandler.shared.sendMessage(text, to: target)
+    private func sendToSession(_ text: String) async {
+        // Re-detect on each send so a session that started outside tmux but
+        // moved into it (or vice versa) routes correctly.
+        let host = await TerminalRouter.shared.detectHost(
+            forSessionPid: session.pid,
+            isInTmux: session.isInTmux
+        )
+        await MainActor.run { self.detectedHost = host }
+
+        guard host.canSend else { return }
+
+        // CGEvent paths need Accessibility — prompt lazily on first need.
+        if host.requiresFocus, !KeystrokeInjector.isAccessibilityTrusted() {
+            _ = await MainActor.run { KeystrokeInjector.requestAccessibility(prompt: true) }
+            return  // user has to grant; they can hit send again
         }
+
+        _ = await TerminalRouter.shared.sendMessage(text, to: host)
     }
 
     private func findTmuxTarget(tty: String) async -> TmuxTarget? {

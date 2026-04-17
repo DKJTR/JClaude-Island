@@ -121,6 +121,23 @@ class ClaudeSessionMonitor: ObservableObject {
         }
     }
 
+    // MARK: - Question Handling (AskUserQuestion)
+
+    /// Submit user-selected answers to a pending AskUserQuestion call
+    /// `answers` is keyed by question header → selected option label
+    func answerQuestion(sessionId: String, answers: [String: String]) {
+        Task {
+            guard let session = await SessionStore.shared.session(for: sessionId),
+                  let ctx = session.phase.questionContext else {
+                return
+            }
+
+            await SessionStore.shared.process(
+                .questionAnswered(sessionId: sessionId, toolUseId: ctx.toolUseId, answers: answers)
+            )
+        }
+    }
+
     /// Archive (remove) a session from the instances list
     func archiveSession(sessionId: String) {
         Task {

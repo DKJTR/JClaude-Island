@@ -62,7 +62,17 @@ JClaude Island is a macOS notch app that brings Claude Code sessions, music play
 
 ## Install
 
-**Requirements:** macOS 15.0+, Xcode, Claude Code CLI
+**Requirements:** macOS 15.0+, Claude Code CLI, Python 3 (system Python is fine).
+
+### One-line install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DKJTR/JClaude-Island/main/scripts/install.sh | bash
+```
+
+This downloads the latest signed `.dmg`, copies the app to `/Applications`, drops the Claude Code hook into `~/.claude/hooks/`, merges the hook entries into `~/.claude/settings.json`, and launches the app. Re-run any time to update.
+
+### Build from source
 
 ```bash
 git clone https://github.com/DKJTR/JClaude-Island.git
@@ -70,17 +80,12 @@ cd JClaude-Island
 xcodebuild -scheme ClaudeIsland -configuration Release build \
   -destination "platform=macOS,arch=arm64" \
   CODE_SIGN_IDENTITY="-"
-```
-
-Copy to Applications:
-
-```bash
 cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app /Applications/
 ```
 
-Or open `ClaudeIsland.xcodeproj` in Xcode and hit **Cmd+R**.
+Or open `ClaudeIsland.xcodeproj` in Xcode and hit **Cmd+R**. Then run `scripts/install.sh` once to wire the Claude Code hooks (or copy `hooks/claude-island-state.py` and update `~/.claude/settings.json` manually).
 
-Hooks auto-install on first launch.
+First launch may ask for **Bluetooth**, **Apple Events** (Terminal/iTerm send), and **Accessibility** (Cursor/VS Code/Warp send) permissions.
 
 ## Architecture
 

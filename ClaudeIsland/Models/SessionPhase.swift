@@ -62,6 +62,63 @@ extension PermissionContext: Equatable {
     }
 }
 
+// MARK: - AskUserQuestion
+
+/// One option within a Claude AskUserQuestion call (pending variant)
+struct PendingQuestionOption: Sendable, Equatable {
+    let label: String
+    let description: String?
+}
+
+/// One question within a Claude AskUserQuestion call (pending variant)
+struct PendingQuestion: Sendable, Equatable {
+    let question: String
+    let header: String
+    let multiSelect: Bool
+    let options: [PendingQuestionOption]
+}
+
+/// Context for an AskUserQuestion call waiting for user input from the island
+struct QuestionContext: Sendable {
+    let toolUseId: String
+    let questions: [PendingQuestion]
+    let receivedAt: Date
+
+    /// Parse from PreToolUse tool_input payload
+    nonisolated static func parse(toolUseId: String, toolInput: [String: AnyCodable]?) -> QuestionContext? {
+        guard let input = toolInput,
+              let questionsRaw = input["questions"]?.value as? [Any]
+        else { return nil }
+
+        let parsed: [PendingQuestion] = questionsRaw.compactMap { item in
+            guard let dict = item as? [String: Any],
+                  let q = dict["question"] as? String,
+                  let header = dict["header"] as? String,
+                  let optsRaw = dict["options"] as? [Any]
+            else { return nil }
+            let multi = dict["multiSelect"] as? Bool ?? false
+            let opts: [PendingQuestionOption] = optsRaw.compactMap { opt in
+                guard let od = opt as? [String: Any],
+                      let label = od["label"] as? String
+                else { return nil }
+                return PendingQuestionOption(label: label, description: od["description"] as? String)
+            }
+            guard !opts.isEmpty else { return nil }
+            return PendingQuestion(question: q, header: header, multiSelect: multi, options: opts)
+        }
+        guard !parsed.isEmpty else { return nil }
+        return QuestionContext(toolUseId: toolUseId, questions: parsed, receivedAt: Date())
+    }
+}
+
+extension QuestionContext: Equatable {
+    nonisolated static func == (lhs: QuestionContext, rhs: QuestionContext) -> Bool {
+        lhs.toolUseId == rhs.toolUseId &&
+        lhs.receivedAt == rhs.receivedAt &&
+        lhs.questions == rhs.questions
+    }
+}
+
 /// Explicit session phases - the state machine
 enum SessionPhase: Sendable {
     /// Session is idle, waiting for user input or new activity
@@ -75,6 +132,9 @@ enum SessionPhase: Sendable {
 
     /// A tool is waiting for user permission approval
     case waitingForApproval(PermissionContext)
+
+    /// Claude has called AskUserQuestion and is waiting for the user's pick
+    case waitingForAnswer(QuestionContext)
 
     /// Context is being compacted (auto or manual)
     case compacting
@@ -100,6 +160,8 @@ enum SessionPhase: Sendable {
             return true
         case (.idle, .waitingForApproval):
             return true  // Direct permission request on idle session
+        case (.idle, .waitingForAnswer):
+            return true  // Direct AskUserQuestion on idle session
         case (.idle, .compacting):
             return true
 
@@ -107,6 +169,8 @@ enum SessionPhase: Sendable {
         case (.processing, .waitingForInput):
             return true
         case (.processing, .waitingForApproval):
+            return true
+        case (.processing, .waitingForAnswer):
             return true
         case (.processing, .compacting):
             return true
@@ -130,6 +194,20 @@ enum SessionPhase: Sendable {
             return true  // Denied and Claude stopped
         case (.waitingForApproval, .waitingForApproval):
             return true  // Another tool needs approval (multiple pending permissions)
+        case (.waitingForApproval, .waitingForAnswer):
+            return true  // Approval resolved, then a question follows
+
+        // WaitingForAnswer transitions
+        case (.waitingForAnswer, .processing):
+            return true  // Answered - Claude resumes
+        case (.waitingForAnswer, .idle):
+            return true  // Cancelled or session went idle
+        case (.waitingForAnswer, .waitingForInput):
+            return true  // Cancelled and Claude stopped
+        case (.waitingForAnswer, .waitingForAnswer):
+            return true  // Another question came in
+        case (.waitingForAnswer, .waitingForApproval):
+            return true  // Answer led to a tool call needing approval
 
         // Compacting transitions
         case (.compacting, .processing):
@@ -153,7 +231,7 @@ enum SessionPhase: Sendable {
     /// Whether this phase indicates the session needs user attention
     var needsAttention: Bool {
         switch self {
-        case .waitingForApproval, .waitingForInput:
+        case .waitingForApproval, .waitingForAnswer, .waitingForInput:
             return true
         default:
             return false
@@ -185,6 +263,18 @@ enum SessionPhase: Sendable {
         }
         return nil
     }
+
+    /// Whether this is a waitingForAnswer phase (AskUserQuestion)
+    var isWaitingForAnswer: Bool {
+        if case .waitingForAnswer = self { return true }
+        return false
+    }
+
+    /// Extract the question context if waiting for answer
+    var questionContext: QuestionContext? {
+        if case .waitingForAnswer(let ctx) = self { return ctx }
+        return nil
+    }
 }
 
 // MARK: - Equatable
@@ -196,6 +286,8 @@ extension SessionPhase: Equatable {
         case (.processing, .processing): return true
         case (.waitingForInput, .waitingForInput): return true
         case (.waitingForApproval(let ctx1), .waitingForApproval(let ctx2)):
+            return ctx1 == ctx2
+        case (.waitingForAnswer(let ctx1), .waitingForAnswer(let ctx2)):
             return ctx1 == ctx2
         case (.compacting, .compacting): return true
         case (.ended, .ended): return true
@@ -217,6 +309,8 @@ extension SessionPhase: CustomStringConvertible {
             return "waitingForInput"
         case .waitingForApproval(let ctx):
             return "waitingForApproval(\(ctx.toolName))"
+        case .waitingForAnswer(let ctx):
+            return "waitingForAnswer(\(ctx.questions.count) question\(ctx.questions.count == 1 ? "" : "s"))"
         case .compacting:
             return "compacting"
         case .ended:

@@ -68,6 +68,12 @@ actor SessionStore {
         case .permissionSocketFailed(let sessionId, let toolUseId):
             await processSocketFailure(sessionId: sessionId, toolUseId: toolUseId)
 
+        case .questionAnswered(let sessionId, let toolUseId, let answers):
+            await processQuestionAnswered(sessionId: sessionId, toolUseId: toolUseId, answers: answers)
+
+        case .questionSocketFailed(let sessionId, let toolUseId):
+            await processSocketFailure(sessionId: sessionId, toolUseId: toolUseId)
+
         case .fileUpdated(let payload):
             await processFileUpdate(payload)
 
@@ -519,6 +525,15 @@ actor SessionStore {
     private func processSocketFailure(sessionId: String, toolUseId: String) async {
         guard var session = sessions[sessionId] else { return }
 
+        // If the failed tool was an AskUserQuestion, just clear the question phase
+        if case .waitingForAnswer(let ctx) = session.phase, ctx.toolUseId == toolUseId {
+            if session.phase.canTransition(to: .idle) {
+                session.phase = .idle
+            }
+            sessions[sessionId] = session
+            return
+        }
+
         // Mark the failed tool's status as error
         updateToolStatus(in: &session, toolId: toolUseId, status: .error)
 
@@ -542,6 +557,24 @@ actor SessionStore {
             } else if case .waitingForApproval = session.phase {
                 // The failed tool wasn't in phase context, but no others pending
                 session.phase = .idle
+            }
+        }
+
+        sessions[sessionId] = session
+    }
+
+    // MARK: - Question (AskUserQuestion) Processing
+
+    private func processQuestionAnswered(sessionId: String, toolUseId: String, answers: [String: String]) async {
+        guard var session = sessions[sessionId] else { return }
+
+        // Send answers back to the python hook (it's blocking on the socket)
+        HookSocketServer.shared.respondToQuestion(toolUseId: toolUseId, answers: answers)
+
+        // Transition phase out of waitingForAnswer
+        if case .waitingForAnswer(let ctx) = session.phase, ctx.toolUseId == toolUseId {
+            if session.phase.canTransition(to: .processing) {
+                session.phase = .processing
             }
         }
 

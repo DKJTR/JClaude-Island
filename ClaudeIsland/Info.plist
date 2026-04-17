@@ -20,7 +20,9 @@
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>JClaude Island shows your connected Bluetooth devices and battery levels.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>JClaude Island controls media playback in Spotify and Apple Music.</string>
+    <string>JClaude Island sends messages to Claude Code in Terminal.app and iTerm2, and controls media playback in Spotify and Apple Music.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>JClaude Island uses Accessibility to type your messages into Claude Code running in Cursor, VS Code, Warp, and other terminals that don't expose a scripting API.</string>
 
     <!-- Sparkle Update Configuration (disabled for personal build) -->
     <key>SUEnableAutomaticChecks</key>
