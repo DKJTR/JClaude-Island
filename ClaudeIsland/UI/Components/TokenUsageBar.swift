@@ -64,19 +64,27 @@ struct TokenUsageBar: View {
             }
             .frame(width: 4, height: 24)
 
-            // Label
-            Text(formattedTokens)
-                .font(.system(size: 8, weight: .medium).monospacedDigit())
+            // Label: percentage + context size e.g. "50%(1M)"
+            Text(formattedLabel)
+                .font(.system(size: 7, weight: .medium).monospacedDigit())
                 .foregroundColor(.white.opacity(0.35))
+                .lineLimit(1)
+                .fixedSize()
         }
     }
 
-    private var formattedTokens: String {
-        if contextTokens >= 1_000_000 {
-            return String(format: "%.1fM", Double(contextTokens) / 1_000_000)
-        } else if contextTokens >= 1_000 {
-            return String(format: "%.0fK", Double(contextTokens) / 1_000)
+    private var percentInt: Int {
+        Int(fraction * 100)
+    }
+
+    private var formattedLabel: String {
+        let pct = "\(percentInt)%"
+        let ctx: String
+        if contextLimit >= 1_000_000 {
+            ctx = "\(contextLimit / 1_000_000)M"
+        } else {
+            ctx = "\(contextLimit / 1_000)K"
         }
-        return "\(contextTokens)"
+        return "\(pct)(\(ctx))"
     }
 }

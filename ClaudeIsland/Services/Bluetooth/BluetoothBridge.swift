@@ -16,6 +16,7 @@ enum BTDeviceType: String, Sendable {
     case airpodsPro = "AirPods Pro"
     case airpodsMax = "AirPods Max"
     case beats = "Beats"
+    case headphones = "Headphones"
     case keyboard = "Keyboard"
     case mouse = "Mouse"
     case trackpad = "Trackpad"
@@ -26,7 +27,7 @@ enum BTDeviceType: String, Sendable {
         switch self {
         case .airpods, .airpodsPro: return "airpodspro"
         case .airpodsMax: return "airpodsmax"
-        case .beats: return "headphones"
+        case .beats, .headphones: return "headphones"
         case .keyboard: return "keyboard.fill"
         case .mouse: return "computermouse.fill"
         case .trackpad: return "rectangle.roundedtop.fill"
@@ -37,7 +38,7 @@ enum BTDeviceType: String, Sendable {
 
     var iconColor: Color {
         switch self {
-        case .airpods, .airpodsPro, .airpodsMax, .beats:
+        case .airpods, .airpodsPro, .airpodsMax, .beats, .headphones:
             return Color.white
         case .keyboard:
             return Color(red: 0.6, green: 0.8, blue: 1.0)
@@ -204,6 +205,11 @@ final class BluetoothBridge {
         if lower.contains("mouse") || lower.contains("magic mouse") { return .mouse }
         if lower.contains("trackpad") || lower.contains("magic trackpad") { return .trackpad }
         if lower.contains("controller") || lower.contains("dualsense") || lower.contains("xbox") { return .gamepad }
+        // Generic headphones/earbuds/ANC
+        if lower.contains("jlab") || lower.contains("headphone") || lower.contains("earbud") ||
+           lower.contains("anc") || lower.contains("wh-") || lower.contains("wf-") ||
+           lower.contains("bose") || lower.contains("sony") || lower.contains("jabra") ||
+           lower.contains("sennheiser") { return .headphones }
 
         // Fallback: check device class
         let majorClass = device.deviceClassMajor
@@ -212,7 +218,8 @@ final class BluetoothBridge {
             if minorClass == kBluetoothDeviceClassMinorPeripheral1Keyboard { return .keyboard }
             if minorClass == kBluetoothDeviceClassMinorPeripheral1Pointing { return .mouse }
         }
-        if majorClass == kBluetoothDeviceClassMajorAudio { return .other }
+        // Audio device class = headphones
+        if majorClass == kBluetoothDeviceClassMajorAudio { return .headphones }
 
         return .other
     }

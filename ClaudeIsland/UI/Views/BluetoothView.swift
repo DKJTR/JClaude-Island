@@ -85,6 +85,10 @@ private struct DeviceRow: View {
             // Battery indicator
             if let battery = device.displayBattery {
                 BatteryIndicator(level: battery)
+            } else {
+                Text("N/A")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.2))
             }
         }
         .padding(.horizontal, 10)

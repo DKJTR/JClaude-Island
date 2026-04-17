@@ -24,7 +24,7 @@ class BluetoothService: ObservableObject {
     var primaryAudioDevice: BTDeviceInfo? {
         connectedDevices.first { device in
             switch device.deviceType {
-            case .airpods, .airpodsPro, .airpodsMax, .beats: return true
+            case .airpods, .airpodsPro, .airpodsMax, .beats, .headphones: return true
             default: return false
             }
         }
@@ -32,13 +32,20 @@ class BluetoothService: ObservableObject {
 
     private let bridge = BluetoothBridge.shared
     private var pollTimer: Timer?
+    private var fastPollTimer: Timer?
     private var previousDeviceIds: Set<String> = []
     private var recentlyConnectedTimer: Timer?
 
     private init() {}
 
     func startMonitoring() {
-        // Poll every 30 seconds (battery changes slowly)
+        // Fast poll every 5 seconds for connection detection
+        fastPollTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.refresh()
+            }
+        }
+        // Slow poll every 30 seconds for battery updates (less aggressive)
         pollTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refresh()
@@ -53,6 +60,8 @@ class BluetoothService: ObservableObject {
     func stopMonitoring() {
         pollTimer?.invalidate()
         pollTimer = nil
+        fastPollTimer?.invalidate()
+        fastPollTimer = nil
         recentlyConnectedTimer?.invalidate()
         recentlyConnectedTimer = nil
     }
