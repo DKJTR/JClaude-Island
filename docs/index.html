@@ -152,10 +152,8 @@ h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 700; letter-spacing: -0.5px
 .media-ctrls { display: flex; gap: 14px; color: rgba(255,255,255,0.5); font-size: 16px; }
 .media-ctrls .play { color: #fff; }
 .prog-bar { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin: 10px 16px 8px; position: relative; }
-.prog-fill { height: 100%; border-radius: 2px; background: #2ecc71; animation: progress 8s linear infinite; }
-.prog-thumb { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; position: absolute; top: -2.5px; animation: thumb 8s linear infinite; box-shadow: 0 0 6px rgba(46,204,113,0.4); }
-@keyframes progress { 0% { width: 10%; } 100% { width: 95%; } }
-@keyframes thumb { 0% { left: 10%; } 100% { left: 95%; } }
+.prog-fill { height: 100%; width: 40%; border-radius: 2px; background: #2ecc71; }
+.prog-thumb { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; position: absolute; top: -2.5px; left: 40%; box-shadow: 0 0 6px rgba(46,204,113,0.4); }
 .prog-times { display: flex; justify-content: space-between; padding: 0 16px 12px; font-size: 10px; color: rgba(255,255,255,0.2); font-family: monospace; }
 
 /* BT section */
@@ -267,60 +265,10 @@ footer a { color: rgba(255,255,255,0.5); }
       </p>
     </div>
 
-    <!-- Right: Animated expanded panel -->
-    <div class="demo-card">
-      <div class="demo-label lbl-purple">Expanded — Everything at a Glance</div>
-      <div class="expanded-mock">
-        <!-- Session rows -->
-        <div class="exp-row">
-          <div class="exp-dot" style="background:#e87848"></div>
-          <div class="exp-info">
-            <div class="exp-title">my-project</div>
-            <div class="exp-sub">Processing...</div>
-          </div>
-          <div class="tok-bar"><div class="tok-fill" style="height:25%;background:linear-gradient(to top,rgba(46,204,113,0.5),#2ecc71)"></div></div>
-          <span class="tok-label">23%(200K)</span>
-        </div>
-        <div class="exp-row">
-          <div class="exp-dot" style="background:#2ecc71"></div>
-          <div class="exp-info">
-            <div class="exp-title">Code Review</div>
-            <div class="exp-sub">Ready</div>
-          </div>
-          <div class="tok-bar"><div class="tok-fill" style="height:65%;background:linear-gradient(to top,rgba(255,200,0,0.5),#ffc800)"></div></div>
-          <span class="tok-label">65%(1M)</span>
-        </div>
-
-        <!-- Media -->
-        <div class="media-mock">
-          <div class="media-art"></div>
-          <div class="media-info">
-            <div class="media-title">King of My Heart</div>
-            <div class="media-artist">Bethel Music</div>
-          </div>
-          <div class="media-ctrls">
-            <span>⏮</span><span class="play">⏸</span><span>⏭</span>
-          </div>
-        </div>
-        <div class="prog-bar">
-          <div class="prog-fill"></div>
-          <div class="prog-thumb"></div>
-        </div>
-        <div class="prog-times"><span>1:23</span><span>3:45</span></div>
-
-        <!-- BT -->
-        <div class="bt-header">BLUETOOTH DEVICES</div>
-        <div class="bt-row">
-          <span class="bt-emoji">🎧</span>
-          <span class="bt-name">AirPods Pro</span>
-          <span class="bt-pct">L 85% · R 90%</span>
-        </div>
-        <div class="bt-row">
-          <span class="bt-emoji">🖲️</span>
-          <span class="bt-name">Magic Trackpad</span>
-          <span class="bt-pct">76%</span>
-        </div>
-      </div>
+    <!-- Right: Real app screenshot -->
+    <div class="demo-card" style="padding:0;overflow:hidden">
+      <img src="app-screenshot.png" alt="JClaude Island in action"
+           style="width:100%;height:100%;object-fit:cover;border-radius:20px">
     </div>
   </div>
 </section>
