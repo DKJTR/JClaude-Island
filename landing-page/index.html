@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JClaude Island — AI copilot and music, together in the notch</title>
+<meta name="description" content="A unified macOS notch app for Claude Code sessions, Spotify, Apple Music, and Bluetooth devices.">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+<meta property="og:title" content="JClaude Island">
+<meta property="og:description" content="Your AI copilot and music, together in the macOS notch.">
+<meta property="og:image" content="https://jclaude-island.aipm-cychien.work/og-image.png">
+<meta property="og:type" content="website">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d0b12;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  line-height: 1.6;
+}
+a { color: #2ecc71; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Hero */
+.hero {
+  min-height: 80vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 60px 24px;
+  background: linear-gradient(165deg, #1a1525 0%, #0d0b12 40%, #0f1a15 70%, #0d0b12 100%);
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(232,120,72,0.06) 0%, transparent 70%);
+  top: -150px; right: 50px;
+}
+.hero::after {
+  content: ''; position: absolute; width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(46,204,113,0.05) 0%, transparent 70%);
+  bottom: -150px; left: 100px;
+}
+.hero > * { position: relative; z-index: 1; }
+.icon {
+  width: 96px; height: 96px; border-radius: 22px;
+  background: linear-gradient(135deg, #6b4a35, #c97848);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 42px; color: rgba(255,255,255,0.9); font-weight: 600;
+  margin-bottom: 32px; box-shadow: 0 12px 48px rgba(200,120,72,0.25);
+}
+h1 { font-size: clamp(32px, 5vw, 56px); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+.tagline { font-size: 20px; color: rgba(255,255,255,0.5); margin-bottom: 40px; max-width: 500px; }
+.cta-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.btn {
+  padding: 14px 28px; border-radius: 12px; font-size: 16px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px; transition: transform 0.15s;
+}
+.btn:hover { transform: translateY(-2px); text-decoration: none; }
+.btn-primary { background: #2ecc71; color: #0d0b12; }
+.btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+.tags { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
+.tag {
+  padding: 6px 14px; border-radius: 20px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.4); font-size: 13px;
+}
+
+/* Showcase */
+.showcase {
+  max-width: 900px; margin: 0 auto; padding: 80px 24px;
+}
+.showcase img {
+  width: 100%; border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* Features */
+.features {
+  max-width: 900px; margin: 0 auto; padding: 0 24px 80px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+}
+@media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+.feature {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 24px;
+}
+.feature h3 { font-size: 16px; margin-bottom: 8px; }
+.feature p { font-size: 14px; color: rgba(255,255,255,0.5); }
+.feature-icon { font-size: 24px; margin-bottom: 12px; }
+
+/* Requirements */
+.requirements {
+  max-width: 900px; margin: 0 auto; padding: 0 24px 80px;
+}
+.requirements h2 { font-size: 24px; margin-bottom: 16px; }
+.req-list { list-style: none; }
+.req-list li { padding: 8px 0; color: rgba(255,255,255,0.6); font-size: 15px; }
+.req-list li::before { content: '✓ '; color: #2ecc71; font-weight: bold; }
+
+/* Footer */
+footer {
+  text-align: center; padding: 40px 24px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.3); font-size: 13px;
+}
+footer a { color: rgba(255,255,255,0.5); }
+
+/* Install code block */
+.install-block {
+  max-width: 900px; margin: 0 auto; padding: 0 24px 60px;
+}
+.install-block h2 { font-size: 24px; margin-bottom: 16px; }
+pre {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 20px; overflow-x: auto;
+  font-family: 'SF Mono', Menlo, monospace; font-size: 14px;
+  color: rgba(255,255,255,0.7); line-height: 1.8;
+}
+pre .comment { color: rgba(255,255,255,0.3); }
+pre .cmd { color: #2ecc71; }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="icon">J✳</div>
+  <h1>JClaude Island</h1>
+  <p class="tagline">Your AI copilot and music, together in the notch.</p>
+  <div class="cta-row">
+    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary">
+      Download DMG
+    </a>
+    <a href="https://github.com/DKJTR/JClaude-Island" class="btn btn-secondary">
+      View on GitHub
+    </a>
+  </div>
+  <div class="tags">
+    <span class="tag">Claude Code</span>
+    <span class="tag">Spotify</span>
+    <span class="tag">Apple Music</span>
+    <span class="tag">AirPods Battery</span>
+    <span class="tag">macOS Notch</span>
+  </div>
+</section>
+
+<section class="showcase">
+  <img src="feature-showcase.png" alt="JClaude Island Features">
+</section>
+
+<section class="features">
+  <div class="feature">
+    <div class="feature-icon">✦</div>
+    <h3>Claude Code Sessions</h3>
+    <p>Monitor multiple sessions with token usage bars. Approve tool permissions and answer questions directly from the notch.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">🎵</div>
+    <h3>Now Playing</h3>
+    <p>Spotify and Apple Music controls with seekable progress bar. Album art crossfade on track change. Click to open the app.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">🎧</div>
+    <h3>Bluetooth Devices</h3>
+    <p>AirPods L/R/Case battery breakdown. Headphones, trackpad, keyboard support. Brief animation when devices connect.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">✨</div>
+    <h3>Smart Priority</h3>
+    <p>Claude takes the notch when processing. Music shows when idle. Expand to see everything stacked. Dynamic panel height.</p>
+  </div>
+</section>
+
+<section class="install-block">
+  <h2>Install</h2>
+  <pre><span class="comment"># Download the DMG from GitHub Releases</span>
+<span class="comment"># Or build from source:</span>
+<span class="cmd">git clone</span> https://github.com/DKJTR/JClaude-Island.git
+<span class="cmd">cd</span> JClaude-Island
+<span class="cmd">xcodebuild</span> -scheme ClaudeIsland -configuration Release build \
+  -destination "platform=macOS,arch=arm64" CODE_SIGN_IDENTITY="-"</pre>
+</section>
+
+<section class="requirements">
+  <h2>Requirements</h2>
+  <ul class="req-list">
+    <li>macOS 15.0+ with a notched MacBook</li>
+    <li>Claude Code CLI (for AI session monitoring)</li>
+    <li>Spotify or Apple Music (for media controls)</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Built on <a href="https://github.com/farouqaldori/claude-island">Claude Island</a> by Farouq Aldori. Apache 2.0 License.</p>
+  <p style="margin-top:8px">Made by <a href="https://aipm-cychien.work">Jack Chien</a></p>
+</footer>
+
+</body>
+</html>
