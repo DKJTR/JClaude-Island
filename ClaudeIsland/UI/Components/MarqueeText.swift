@@ -11,11 +11,12 @@ struct MarqueeText: View {
     let text: String
     let font: Font
     let color: Color
-    let speed: Double // points per second
+    let speed: Double
 
     @State private var offset: CGFloat = 0
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
+    @State private var animating = false
 
     private var needsScrolling: Bool {
         textWidth > containerWidth + 1
@@ -29,72 +30,78 @@ struct MarqueeText: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let containerW = geo.size.width
+        // Use overlay + hidden text to measure, avoid GeometryReader
+        Text(text)
+            .font(font)
+            .foregroundColor(.clear)
+            .lineLimit(1)
+            .fixedSize(horizontal: false, vertical: true)
+            .overlay {
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = geo.size.height
 
-            ZStack(alignment: .leading) {
-                if needsScrolling {
-                    // Two copies for seamless loop
-                    HStack(spacing: 40) {
-                        Text(text)
-                            .font(font)
-                            .foregroundColor(color)
-                            .fixedSize()
-                        Text(text)
-                            .font(font)
-                            .foregroundColor(color)
-                            .fixedSize()
+                    ZStack(alignment: .leading) {
+                        if needsScrolling {
+                            HStack(spacing: 40) {
+                                Text(text)
+                                    .font(font)
+                                    .foregroundColor(color)
+                                    .fixedSize()
+                                Text(text)
+                                    .font(font)
+                                    .foregroundColor(color)
+                                    .fixedSize()
+                            }
+                            .offset(x: offset, y: 0)
+                        } else {
+                            Text(text)
+                                .font(font)
+                                .foregroundColor(color)
+                                .lineLimit(1)
+                        }
                     }
-                    .offset(x: offset)
-                } else {
-                    Text(text)
-                        .font(font)
-                        .foregroundColor(color)
-                        .lineLimit(1)
-                }
-            }
-            .frame(width: containerW, alignment: .leading)
-            .clipped()
-            .onAppear {
-                containerWidth = containerW
-                startScrolling()
-            }
-            .onChange(of: text) { _, _ in
-                offset = 0
-                measureText()
-                startScrolling()
-            }
-        }
-        .background(
-            Text(text)
-                .font(font)
-                .fixedSize()
-                .hidden()
-                .background(GeometryReader { textGeo in
-                    Color.clear.onAppear {
-                        textWidth = textGeo.size.width
+                    .frame(width: w, height: h)
+                    .clipped()
+                    .onAppear {
+                        containerWidth = w
                     }
                     .onChange(of: text) { _, _ in
-                        textWidth = textGeo.size.width
+                        offset = 0
+                        animating = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            startScrolling()
+                        }
                     }
-                })
-        )
-    }
-
-    private func measureText() {
-        // Width is measured via hidden background text
+                }
+            }
+            .background(
+                Text(text)
+                    .font(font)
+                    .fixedSize()
+                    .hidden()
+                    .background(GeometryReader { textGeo in
+                        Color.clear.onAppear {
+                            textWidth = textGeo.size.width
+                            startScrolling()
+                        }
+                        .onChange(of: text) { _, _ in
+                            textWidth = textGeo.size.width
+                        }
+                    })
+            )
     }
 
     private func startScrolling() {
-        guard needsScrolling else {
-            offset = 0
+        guard needsScrolling, !animating else {
+            if !needsScrolling { offset = 0 }
             return
         }
+        animating = true
 
-        let totalDistance = textWidth + 40 // text width + gap
+        let totalDistance = textWidth + 40
         let duration = totalDistance / speed
 
-        // Reset and start
         offset = 0
         withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
             offset = -totalDistance

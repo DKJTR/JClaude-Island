@@ -28,7 +28,6 @@ struct MediaClosedLeftWing: View {
                     color: .white.opacity(0.85),
                     speed: 25
                 )
-                .frame(height: 20)
             }
             .padding(.leading, 6)
         }
