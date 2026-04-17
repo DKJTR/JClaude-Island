@@ -1,9 +1,5 @@
 <div align="center">
-  <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="JClaude Island" width="80" height="80">
-  <h1>JClaude Island</h1>
-  <p><strong>Your AI copilot and music, together in the notch.</strong></p>
-  <br />
-  <img src="feature-showcase.png" alt="Features" width="700">
+  <img src="feature-showcase.png" alt="JClaude Island" width="700">
 </div>
 
 ---

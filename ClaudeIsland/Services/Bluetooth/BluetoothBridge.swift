@@ -36,6 +36,19 @@ enum BTDeviceType: String, Sendable {
         }
     }
 
+    var emoji: String {
+        switch self {
+        case .airpods, .airpodsPro: return "🎧"
+        case .airpodsMax: return "🎧"
+        case .beats, .headphones: return "🎧"
+        case .keyboard: return "⌨️"
+        case .mouse: return "🖱️"
+        case .trackpad: return "🖲️"
+        case .gamepad: return "🎮"
+        case .other: return "📡"
+        }
+    }
+
     var iconColor: Color {
         switch self {
         case .airpods, .airpodsPro, .airpodsMax, .beats, .headphones:

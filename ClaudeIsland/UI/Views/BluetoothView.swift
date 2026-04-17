@@ -61,10 +61,9 @@ private struct DeviceRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Device icon
-            Image(systemName: device.deviceType.sfSymbol)
-                .font(.system(size: 18))
-                .foregroundColor(device.deviceType.iconColor)
+            // Device icon (emoji)
+            Text(device.deviceType.emoji)
+                .font(.system(size: 20))
                 .frame(width: 28, height: 28)
 
             // Name + type
