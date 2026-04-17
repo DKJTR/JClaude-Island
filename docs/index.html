@@ -3,16 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JClaude Island — Answer Claude from your macOS notch</title>
-<meta name="description" content="Macbook notch app that lets you answer Claude Code's AskUserQuestion and approve tools without leaving the notch. Works with tmux, Terminal, iTerm2, Cursor, VS Code, Warp.">
-<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0d0b12">
+<title>JClaude Island — Answer Claude Code from the macOS notch</title>
+<meta name="description" content="A macOS notch app that lets you answer Claude Code questions and approve tool calls in one click — without leaving the notch. Works with Cursor, VS Code, Warp, iTerm2, Terminal, tmux. Free, open source, local-only.">
+<meta name="keywords" content="Claude Code, macOS notch app, Dynamic Island for Mac, AskUserQuestion, Claude permissions, Cursor, VS Code, Warp, iTerm2, tmux, AI coding, agentic IDE, MacBook notch utility">
+<meta name="author" content="Jack Chien">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://jclaude-island.aipm-cychien.work/">
+
+<!-- Favicons -->
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
-<meta property="og:title" content="JClaude Island — Answer Claude from your notch">
-<meta property="og:description" content="When Claude Code asks a question, the option chips render right in the macOS notch. One click answers. Works with Cursor, VS Code, Terminal, tmux, Warp.">
-<meta property="og:image" content="https://jclaude-island.aipm-cychien.work/og-image.png">
+
+<!-- Open Graph -->
+<meta property="og:site_name" content="JClaude Island">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://jclaude-island.aipm-cychien.work/">
+<meta property="og:title" content="JClaude Island — Answer Claude Code from the macOS notch">
+<meta property="og:description" content="When Claude Code asks a question, option chips appear in your macOS notch. One click answers. Works with Cursor, VS Code, Warp, iTerm2, tmux. Free, open source.">
+<meta property="og:image" content="https://jclaude-island.aipm-cychien.work/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="JClaude Island — the orange Claude crab in a MacBook notch with a row of option chips">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Answer Claude Code from the macOS notch">
+<meta name="twitter:description" content="When Claude asks a question, option chips appear in your notch. One click answers. Works in Cursor, VS Code, Warp, iTerm2, tmux.">
+<meta name="twitter:image" content="https://jclaude-island.aipm-cychien.work/og-image.png">
+
+<!-- Performance hints -->
+<link rel="preload" href="demo.mp4" as="video" type="video/mp4">
+<link rel="dns-prefetch" href="https://github.com">
+<link rel="dns-prefetch" href="https://raw.githubusercontent.com">
+
+<!-- Structured data: SoftwareApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "JClaude Island",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS 15+",
+  "description": "Answer Claude Code questions and approve tool calls from the macOS notch. Works with Cursor, VS Code, Warp, iTerm2, Terminal, tmux.",
+  "url": "https://jclaude-island.aipm-cychien.work/",
+  "downloadUrl": "https://github.com/DKJTR/JClaude-Island/releases/latest",
+  "softwareVersion": "1.4.1",
+  "license": "https://www.apache.org/licenses/LICENSE-2.0",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "Jack Chien",
+    "url": "https://aipm-cychien.work"
+  },
+  "isBasedOn": {
+    "@type": "SoftwareApplication",
+    "name": "Claude Island",
+    "url": "https://github.com/farouqaldori/claude-island"
+  }
+}
+</script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -51,14 +107,32 @@ a:hover { text-decoration: underline; }
 }
 h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
 .tagline { font-size: clamp(16px, 2vw, 20px); color: rgba(255,255,255,0.5); margin-bottom: 40px; max-width: 600px; }
-.cta-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.cta-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 .btn {
-  padding: 14px 32px; border-radius: 12px; font-size: 16px; font-weight: 600;
-  display: inline-flex; align-items: center; gap: 8px; transition: transform 0.15s;
+  padding: 16px 28px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+  cursor: pointer;
 }
+.btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .btn:hover { transform: translateY(-2px); text-decoration: none; }
-.btn-primary { background: #2ecc71; color: #0d0b12; }
-.btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+.btn-primary {
+  background: #2ecc71; color: #0d0b12;
+  box-shadow: 0 8px 24px rgba(46,204,113,0.25);
+}
+.btn-primary:hover { background: #28b864; box-shadow: 0 12px 32px rgba(46,204,113,0.4); }
+.btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.14);
+  font-family: 'SF Mono', Menlo, monospace;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.22); }
 .tags { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
 .tag {
   padding: 6px 14px; border-radius: 20px;
@@ -225,18 +299,34 @@ h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 700; letter-spacing: -0.5px
 
 /* Features */
 .features {
-  max-width: 1200px; margin: 0 auto; padding: 0 40px 80px;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+  max-width: 1200px; margin: 0 auto; padding: 24px 40px 96px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
 }
-@media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 500px) { .features { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .features { grid-template-columns: 1fr; gap: 18px; } }
 .feature {
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px; padding: 28px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 18px;
+  padding: 32px;
+  transition: transform 0.18s ease, border-color 0.2s ease, background 0.2s ease;
 }
-.feature h3 { font-size: 16px; margin-bottom: 8px; }
-.feature p { font-size: 14px; color: rgba(255,255,255,0.5); }
-.feature-icon { font-size: 28px; margin-bottom: 14px; }
+.feature:hover {
+  transform: translateY(-4px);
+  border-color: rgba(232,120,72,0.25);
+  background: rgba(255,255,255,0.05);
+}
+.feature h3 { font-size: 18px; margin-bottom: 10px; font-weight: 600; }
+.feature p { font-size: 14px; color: rgba(255,255,255,0.55); line-height: 1.6; }
+.feature-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(232,120,72,0.18), rgba(232,120,72,0.04));
+  border: 1px solid rgba(232,120,72,0.22);
+  color: #e87848;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 18px;
+}
+.feature-icon svg { width: 22px; height: 22px; }
 
 /* Install + Requirements */
 .bottom-grid {
@@ -371,8 +461,18 @@ footer a { color: rgba(255,255,255,0.5); }
   <h1>Answer Claude. From the notch.</h1>
   <p class="tagline">When Claude asks a question, the option chips appear in your notch — one click answers it. Permission prompts, music, AirPods battery, all in the same place. No window. No alt-tab.</p>
   <div class="cta-row">
-    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary">Download v1.4 DMG</a>
-    <a href="#install" class="btn btn-secondary">curl install</a>
+    <a href="https://github.com/DKJTR/JClaude-Island/releases/latest" class="btn btn-primary" aria-label="Download the latest DMG">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>
+      </svg>
+      Download DMG
+    </a>
+    <a href="#install" class="btn btn-secondary" aria-label="See the curl install command">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+      curl Install
+    </a>
   </div>
   <div class="tags">
     <span class="tag">AskUserQuestion</span>
@@ -547,47 +647,34 @@ footer a { color: rgba(255,255,255,0.5); }
   </div>
 </section>
 
-<!-- Features -->
+<!-- Killer features — kept to 3 -->
 <section class="features">
   <div class="feature">
-    <div class="feature-icon">✦</div>
+    <div class="feature-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+      </svg>
+    </div>
     <h3>Answer Claude in-place</h3>
-    <p>AskUserQuestion options render as chips right in the notch row. One click sends the answer to the terminal picker. Mirror mode keeps both UIs in sync.</p>
+    <p>AskUserQuestion options render as chips right in your notch. One click sends the answer to the terminal picker — mirror mode keeps both UIs in sync.</p>
   </div>
   <div class="feature">
-    <div class="feature-icon">⌨</div>
-    <h3>Any terminal</h3>
-    <p>tmux, Terminal.app, iTerm2, Cursor, VS Code, Warp, Ghostty. The router auto-detects your host and uses the right strategy — AppleScript or CGEvent.</p>
+    <div class="feature-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+    </div>
+    <h3>Any terminal you use</h3>
+    <p>tmux, Terminal.app, iTerm2, Cursor, VS Code, Warp, Ghostty. JClaude auto-detects your host and routes via the right strategy — no config.</p>
   </div>
   <div class="feature">
-    <div class="feature-icon">?</div>
-    <h3>Tells you what's needed</h3>
-    <p>Permission requests get a purple blinking pixel <code>?</code>. Questions get a static orange one. Both at once → it alternates. Glance and you know.</p>
-  </div>
-  <div class="feature">
-    <div class="feature-icon">🎵</div>
-    <h3>Now Playing</h3>
-    <p>Spotify and Apple Music. Seekable progress, album crossfade, click to open. Toggle off if you don't want it.</p>
-  </div>
-  <div class="feature">
-    <div class="feature-icon">🎧</div>
-    <h3>AirPods battery</h3>
-    <p>L / R / Case breakdown. Trackpad, keyboard, headphones. Brief animation when something pairs. Toggle off if you don't want it.</p>
-  </div>
-  <div class="feature">
-    <div class="feature-icon">🔒</div>
+    <div class="feature-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
     <h3>Local-only by design</h3>
-    <p>No telemetry. No analytics. Per-process socket auth. AppleScript injection-safe. Atomic settings write. Nothing leaves your Mac.</p>
-  </div>
-  <div class="feature">
-    <div class="feature-icon">⚡</div>
-    <h3>One-line install</h3>
-    <p><code>curl ... | bash</code> downloads the DMG, copies the app, wires the Claude Code hooks, and launches. Re-run any time to update.</p>
-  </div>
-  <div class="feature">
-    <div class="feature-icon">🔔</div>
-    <h3>Sound alerts</h3>
-    <p>Your chosen system chime fires when a new permission or question arrives — only if your terminal isn't already in front.</p>
+    <p>Zero telemetry. Per-process socket auth. AppleScript injection-safe. Atomic settings write. Nothing about your code, prompts, or activity leaves your Mac.</p>
   </div>
 </section>
 
