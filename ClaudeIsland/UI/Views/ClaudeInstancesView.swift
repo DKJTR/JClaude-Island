@@ -11,6 +11,8 @@ import SwiftUI
 struct ClaudeInstancesView: View {
     @ObservedObject var sessionMonitor: ClaudeSessionMonitor
     @ObservedObject var viewModel: NotchViewModel
+    var visibleSessionIds: Set<String>? = nil // nil = show all
+    var maxVisible: Int = 5
 
     var body: some View {
         if sessionMonitor.instances.isEmpty {
@@ -65,10 +67,16 @@ struct ClaudeInstancesView: View {
         }
     }
 
+    private var filteredInstances: [SessionState] {
+        if let ids = visibleSessionIds {
+            return sortedInstances.filter { ids.contains($0.stableId) }
+        }
+        return Array(sortedInstances.prefix(maxVisible))
+    }
+
     private var instancesList: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 2) {
-                ForEach(sortedInstances) { session in
+        LazyVStack(spacing: 2) {
+            ForEach(filteredInstances) { session in
                     InstanceRow(
                         session: session,
                         onFocus: { focusSession(session) },
@@ -82,8 +90,6 @@ struct ClaudeInstancesView: View {
                 }
             }
             .padding(.vertical, 4)
-        }
-        .scrollBounceBehavior(.basedOnSize)
     }
 
     // MARK: - Actions

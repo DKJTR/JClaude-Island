@@ -29,6 +29,11 @@ struct NotchView: View {
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
     @State private var modeScale: CGFloat = 1.0
+    @State private var claudePage: Int = 0
+    @State private var btPage: Int = 0
+
+    private let maxClaudeVisible = 5
+    private let maxBTVisible = 3
 
     @Namespace private var activityNamespace
 
@@ -461,34 +466,29 @@ struct NotchView: View {
                 )
                 .id(session.sessionId)
             default:
-                // Stacked layout: Claude on top (if sessions), Media below (if playing)
+                // Stacked layout with pagination
                 VStack(spacing: 0) {
-                    // Claude section (only if sessions exist)
+                    // Claude section (paginated, max 5 visible)
                     if !sessionMonitor.instances.isEmpty {
-                        ClaudeInstancesView(
-                            sessionMonitor: sessionMonitor,
-                            viewModel: viewModel
-                        )
+                        paginatedClaudeSection
                     }
 
-                    // Media section (if music is playing)
+                    // Media section
                     if hasMediaActivity {
                         if !sessionMonitor.instances.isEmpty {
                             Divider()
                                 .background(Color.white.opacity(0.08))
                                 .padding(.vertical, 4)
                         }
-
                         CompactMediaRow(mediaService: mediaService)
                     }
 
-                    // Bluetooth section (if devices connected)
+                    // Bluetooth section (paginated, max 3 visible)
                     if !bluetoothService.connectedDevices.isEmpty {
                         Divider()
                             .background(Color.white.opacity(0.08))
                             .padding(.vertical, 4)
-
-                        BluetoothView(bluetoothService: bluetoothService)
+                        paginatedBluetoothSection
                     }
 
                     // Nothing active
@@ -502,12 +502,93 @@ struct NotchView: View {
                                 .foregroundColor(.white.opacity(0.3))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        .padding(.vertical, 20)
                     }
                 }
             }
         }
         .frame(width: notchSize.width - 24)
+    }
+
+    // MARK: - Paginated Sections
+
+    @ViewBuilder
+    private var paginatedClaudeSection: some View {
+        let all = sessionMonitor.instances
+        let totalPages = max(1, (all.count + maxClaudeVisible - 1) / maxClaudeVisible)
+        let safePage = min(claudePage, totalPages - 1)
+        let start = safePage * maxClaudeVisible
+        let end = min(start + maxClaudeVisible, all.count)
+        let visible = Array(all[start..<end])
+
+        // Use a minimal wrapper that passes visible sessions to ClaudeInstancesView
+        ClaudeInstancesView(
+            sessionMonitor: sessionMonitor,
+            viewModel: viewModel,
+            visibleSessionIds: Set(visible.map { $0.stableId }),
+            maxVisible: maxClaudeVisible
+        )
+
+        // Page nav (only if more than 5 sessions)
+        if totalPages > 1 {
+            paginationControls(
+                page: safePage,
+                totalPages: totalPages,
+                label: "\(start + 1)-\(end) of \(all.count) sessions",
+                onPrev: { claudePage = max(0, safePage - 1) },
+                onNext: { claudePage = min(totalPages - 1, safePage + 1) }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var paginatedBluetoothSection: some View {
+        let all = bluetoothService.connectedDevices
+        let totalPages = max(1, (all.count + maxBTVisible - 1) / maxBTVisible)
+        let safePage = min(btPage, totalPages - 1)
+        let start = safePage * maxBTVisible
+        let end = min(start + maxBTVisible, all.count)
+        let visible = Array(all[start..<end])
+
+        BluetoothView(bluetoothService: bluetoothService, visibleDevices: visible)
+
+        if totalPages > 1 {
+            paginationControls(
+                page: safePage,
+                totalPages: totalPages,
+                label: "\(start + 1)-\(end) of \(all.count) devices",
+                onPrev: { btPage = max(0, safePage - 1) },
+                onNext: { btPage = min(totalPages - 1, safePage + 1) }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func paginationControls(page: Int, totalPages: Int, label: String, onPrev: @escaping () -> Void, onNext: @escaping () -> Void) -> some View {
+        HStack(spacing: 12) {
+            Button(action: onPrev) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(page > 0 ? .white.opacity(0.6) : .white.opacity(0.15))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .disabled(page == 0)
+
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.white.opacity(0.3))
+
+            Button(action: onNext) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(page < totalPages - 1 ? .white.opacity(0.6) : .white.opacity(0.15))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .disabled(page == totalPages - 1)
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Event Handlers

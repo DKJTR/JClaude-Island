@@ -9,9 +9,14 @@ import SwiftUI
 
 struct BluetoothView: View {
     @ObservedObject var bluetoothService: BluetoothService
+    var visibleDevices: [BTDeviceInfo]? = nil // nil = show all
+
+    private var devices: [BTDeviceInfo] {
+        visibleDevices ?? bluetoothService.connectedDevices
+    }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Header
             HStack {
                 Text("BLUETOOTH DEVICES")
@@ -31,28 +36,19 @@ struct BluetoothView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 4)
-            .padding(.top, 8)
 
-            if bluetoothService.connectedDevices.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "wave.3.right")
-                        .font(.system(size: 28, weight: .light))
-                        .foregroundColor(.white.opacity(0.2))
-                    Text("No devices connected")
-                        .font(.system(size: 13))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 20)
+            if devices.isEmpty {
+                Text("No devices connected")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.3))
+                    .padding(.vertical, 8)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(bluetoothService.connectedDevices) { device in
-                            DeviceRow(device: device)
-                        }
+                LazyVStack(spacing: 6) {
+                    ForEach(devices) { device in
+                        DeviceRow(device: device)
                     }
-                    .padding(.horizontal, 4)
                 }
+                .padding(.horizontal, 4)
             }
         }
     }

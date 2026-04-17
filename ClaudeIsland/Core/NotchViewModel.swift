@@ -87,13 +87,21 @@ class NotchViewModel: ObservableObject {
                     + claudeDirSelector.expandedPickerHeight
             )
         case .instances:
-            // Extra height for stacked sections
-            let mediaExtra: CGFloat = MediaRemoteService.shared.isActive ? 90 : 0
-            let btDevices = BluetoothService.shared.connectedDevices.count
-            let btExtra: CGFloat = btDevices > 0 ? CGFloat(40 + btDevices * 48) : 0
+            // Dynamic height: let SwiftUI measure content, just set a generous max
+            // The actual content is wrapped in a VStack that sizes naturally
+            let hasMedia = MediaRemoteService.shared.isActive
+            let mediaHeight: CGFloat = hasMedia ? 100 : 0
+
+            let btCount = BluetoothService.shared.connectedDevices.count
+            let btVisible = min(btCount, 3)
+            let btHeight: CGFloat = btVisible > 0 ? CGFloat(36 + btVisible * 50) : 0
+
+            // Base 80 (header+padding) + estimate per-session row
+            // Sessions are paginated to max 5 visible
+            let totalHeight = 80 + mediaHeight + btHeight
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
-                height: 320 + mediaExtra + btExtra
+                height: min(max(totalHeight, 180), 600)
             )
         case .media:
             return CGSize(
