@@ -8,6 +8,7 @@
 import Foundation
 import IOBluetooth
 import IOKit
+import SwiftUI
 
 /// Bluetooth device type classification
 enum BTDeviceType: String, Sendable {
@@ -25,12 +26,29 @@ enum BTDeviceType: String, Sendable {
         switch self {
         case .airpods, .airpodsPro: return "airpodspro"
         case .airpodsMax: return "airpodsmax"
-        case .beats: return "beats.headphones"
-        case .keyboard: return "keyboard"
-        case .mouse: return "computermouse"
-        case .trackpad: return "trackpad"
-        case .gamepad: return "gamecontroller"
+        case .beats: return "headphones"
+        case .keyboard: return "keyboard.fill"
+        case .mouse: return "computermouse.fill"
+        case .trackpad: return "rectangle.roundedtop.fill"
+        case .gamepad: return "gamecontroller.fill"
         case .other: return "wave.3.right"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .airpods, .airpodsPro, .airpodsMax, .beats:
+            return Color.white
+        case .keyboard:
+            return Color(red: 0.6, green: 0.8, blue: 1.0)
+        case .mouse:
+            return Color(red: 0.8, green: 0.7, blue: 1.0)
+        case .trackpad:
+            return Color(red: 0.7, green: 0.9, blue: 0.8)
+        case .gamepad:
+            return Color(red: 1.0, green: 0.7, blue: 0.5)
+        case .other:
+            return Color.white.opacity(0.7)
         }
     }
 }

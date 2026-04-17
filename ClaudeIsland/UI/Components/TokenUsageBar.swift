@@ -31,8 +31,16 @@ struct TokenUsageBar: View {
 
     private var barColor: Color {
         if fraction > 0.9 { return Color(red: 1.0, green: 0.3, blue: 0.3) }
-        if fraction > 0.7 { return Color(red: 1.0, green: 0.7, blue: 0.0) }
-        return TerminalColors.cyan
+        if fraction > 0.7 { return Color(red: 1.0, green: 0.6, blue: 0.0) }
+        if fraction > 0.5 { return Color(red: 1.0, green: 0.8, blue: 0.0) }
+        return TerminalColors.green
+    }
+
+    private var barColorLight: Color {
+        if fraction > 0.9 { return Color(red: 1.0, green: 0.5, blue: 0.5) }
+        if fraction > 0.7 { return Color(red: 1.0, green: 0.75, blue: 0.3) }
+        if fraction > 0.5 { return Color(red: 1.0, green: 0.9, blue: 0.4) }
+        return Color(red: 0.5, green: 0.85, blue: 0.55)
     }
 
     var body: some View {
@@ -46,7 +54,7 @@ struct TokenUsageBar: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(
                             LinearGradient(
-                                colors: [barColor.opacity(0.6), barColor],
+                                colors: [barColor, barColorLight],
                                 startPoint: .bottom,
                                 endPoint: .top
                             )

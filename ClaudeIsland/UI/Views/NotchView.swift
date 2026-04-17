@@ -81,6 +81,11 @@ struct NotchView: View {
         mediaService.isActive && (mediaService.nowPlaying?.hasContent ?? false)
     }
 
+    /// Whether a Bluetooth device just connected (brief animation)
+    private var hasBluetoothConnection: Bool {
+        bluetoothService.recentlyConnected != nil
+    }
+
     /// Closed notch expansion: show Claude if actively working, else show media
     private var expansionWidth: CGFloat {
         let permissionIndicatorWidth: CGFloat = hasPendingPermission ? 18 : 0
@@ -89,6 +94,12 @@ struct NotchView: View {
         // Claude takes priority only when actively working
         if closedShowsClaude {
             return baseWidth + permissionIndicatorWidth
+        }
+        // Bluetooth connection animation (overrides media briefly)
+        if hasBluetoothConnection {
+            let leftWing = max(0, closedNotchSize.height - 12) + 10 + 80
+            let rightWing = max(0, closedNotchSize.height - 12) + 10
+            return leftWing + rightWing
         }
         // Music-only: left wing (album+song) + right wing (sound bars)
         if hasMediaActivity {
@@ -257,6 +268,10 @@ struct NotchView: View {
             }
         }
         .animation(.smooth, value: mediaService.isActive)
+        .animation(.smooth, value: hasBluetoothConnection)
+        .onChange(of: bluetoothService.recentlyConnected?.id) { _, _ in
+            handleProcessingChange()
+        }
     }
 
     // MARK: - Notch Layout
@@ -267,7 +282,7 @@ struct NotchView: View {
 
     /// Whether to show the expanded closed state
     private var showClosedActivity: Bool {
-        closedShowsClaude || hasMediaActivity
+        closedShowsClaude || hasBluetoothConnection || hasMediaActivity
     }
 
     @ViewBuilder
@@ -344,6 +359,24 @@ struct NotchView: View {
                         .frame(width: sideWidth)
                         .padding(.trailing, 4)
                 }
+            } else if bluetoothService.recentlyConnected != nil {
+                // CLOSED — Bluetooth just connected: brief animation
+                HStack(spacing: 6) {
+                    Image(systemName: bluetoothService.recentlyConnected!.deviceType.sfSymbol)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(TerminalColors.cyan)
+
+                    Text(bluetoothService.recentlyConnected!.name)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(1)
+
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(TerminalColors.green)
+                }
+                .frame(width: sideWidth * 2 + closedNotchSize.width - cornerRadiusInsets.closed.top + 80)
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             } else if hasMediaActivity {
                 // CLOSED — Media-only: wings only (progress bar is in expanded view)
                 HStack(spacing: 0) {
@@ -376,7 +409,7 @@ struct NotchView: View {
     @ViewBuilder
     private var openedHeaderContent: some View {
         HStack(spacing: 8) {
-            if !hasClaudeActivity {
+            if !hasClaudeVisibleState {
                 ClaudeCrabIcon(size: 14)
                     .padding(.leading, 8)
             }
@@ -480,12 +513,12 @@ struct NotchView: View {
     // MARK: - Event Handlers
 
     private func handleProcessingChange() {
-        if closedShowsClaude || hasMediaActivity {
+        if closedShowsClaude || hasBluetoothConnection || hasMediaActivity {
             isVisible = true
         } else {
             if viewModel.status == .closed && viewModel.hasPhysicalNotch {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if !self.closedShowsClaude && !self.hasMediaActivity && self.viewModel.status == .closed {
+                    if !self.closedShowsClaude && !self.hasBluetoothConnection && !self.hasMediaActivity && self.viewModel.status == .closed {
                         self.isVisible = false
                     }
                 }
@@ -504,7 +537,7 @@ struct NotchView: View {
         case .closed:
             guard viewModel.hasPhysicalNotch else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                if viewModel.status == .closed && !closedShowsClaude && !hasMediaActivity {
+                if viewModel.status == .closed && !closedShowsClaude && !hasBluetoothConnection && !hasMediaActivity {
                     isVisible = false
                 }
             }

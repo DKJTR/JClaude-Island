@@ -14,16 +14,17 @@ struct BluetoothView: View {
         VStack(spacing: 12) {
             // Header
             HStack {
-                Text("Connected Devices")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.8))
+                Text("BLUETOOTH DEVICES")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundColor(TerminalColors.cyan)
                 Spacer()
                 Button {
                     bluetoothService.refresh()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(TerminalColors.cyan.opacity(0.6))
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
@@ -67,7 +68,7 @@ private struct DeviceRow: View {
             // Device icon
             Image(systemName: device.deviceType.sfSymbol)
                 .font(.system(size: 18))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(device.deviceType.iconColor)
                 .frame(width: 28, height: 28)
 
             // Name + type
@@ -121,7 +122,7 @@ private struct DeviceRow: View {
             }
             if let caseLevel = device.batteryLevelCase {
                 HStack(spacing: 3) {
-                    Image(systemName: "case")
+                    Image(systemName: "shippingbox.fill")
                         .font(.system(size: 8))
                         .foregroundColor(.white.opacity(0.4))
                     Text("\(caseLevel)%")
@@ -146,20 +147,26 @@ private struct BatteryIndicator: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            Text("\(level)%")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundColor(fillColor)
+
             // Battery bar
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 24, height: 10)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 32, height: 10)
 
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(fillColor)
-                    .frame(width: max(2, 24 * CGFloat(level) / 100), height: 10)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(
+                        LinearGradient(
+                            colors: [fillColor, fillColor.opacity(0.7)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(2, 32 * CGFloat(level) / 100), height: 10)
             }
-
-            Text("\(level)%")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.white.opacity(0.5))
         }
     }
 
