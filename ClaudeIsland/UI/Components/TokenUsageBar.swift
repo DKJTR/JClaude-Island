@@ -69,8 +69,9 @@ struct TokenUsageBar: View {
                 .font(.system(size: 7, weight: .medium).monospacedDigit())
                 .foregroundColor(.white.opacity(0.35))
                 .lineLimit(1)
-                .fixedSize()
+                .frame(width: 42, alignment: .leading)
         }
+        .frame(width: 50)
     }
 
     private var percentInt: Int {
