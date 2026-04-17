@@ -58,8 +58,8 @@ def send_event(state):
         sock.sendall(json.dumps(state).encode())
 
         # For permission requests, wait for response
-        if state.get("status") == "waiting_for_approval":
-            response = sock.recv(4096)
+        if state.get("status") in ("waiting_for_approval", "waiting_for_answer"):
+            response = sock.recv(8192)
             sock.close()
             if response:
                 return json.loads(response.decode())
@@ -101,11 +101,42 @@ def main():
         state["status"] = "processing"
 
     elif event == "PreToolUse":
-        state["status"] = "running_tool"
-        state["tool"] = data.get("tool_name")
-        state["tool_input"] = tool_input
-        # Send tool_use_id to Swift for caching
+        tool_name = data.get("tool_name")
         tool_use_id_from_event = data.get("tool_use_id")
+
+        # Special case: AskUserQuestion → route to ClaudeIsland for answer
+        if tool_name == "AskUserQuestion":
+            state["status"] = "waiting_for_answer"
+            state["tool"] = tool_name
+            state["tool_input"] = tool_input
+            if tool_use_id_from_event:
+                state["tool_use_id"] = tool_use_id_from_event
+
+            # Block on island response (same pattern as PermissionRequest)
+            response = send_event(state)
+
+            if response and isinstance(response.get("answers"), dict) and response["answers"]:
+                answers = response["answers"]
+                answer_json = json.dumps(answers, ensure_ascii=False)
+                output = {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": (
+                            f"User answered via ClaudeIsland: {answer_json}. "
+                            "Treat this JSON object as the AskUserQuestion result and continue."
+                        ),
+                    }
+                }
+                print(json.dumps(output))
+                sys.exit(0)
+
+            # No island response → fall through to terminal picker
+            sys.exit(0)
+
+        state["status"] = "running_tool"
+        state["tool"] = tool_name
+        state["tool_input"] = tool_input
         if tool_use_id_from_event:
             state["tool_use_id"] = tool_use_id_from_event
 
