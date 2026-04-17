@@ -238,6 +238,11 @@ actor ConversationParser {
                 summary = summaryText
             }
 
+            // /rename stores the title as type: "custom-title" with field "customTitle"
+            if type == "custom-title", let customTitle = json["customTitle"] as? String {
+                summary = customTitle
+            }
+
             if summary != nil && lastMessage != nil && foundLastUserMessage {
                 break
             }
