@@ -66,15 +66,64 @@ h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 700; letter-spacing: -0.5px
   color: rgba(255,255,255,0.4); font-size: 13px;
 }
 
-/* Video Demo */
+/* Video Demo — MacBook frame */
 .video-section {
-  max-width: 1000px; margin: -40px auto 0; padding: 0 40px 60px;
+  max-width: 1100px; margin: -20px auto 0; padding: 0 40px 80px;
   position: relative; z-index: 2;
 }
+.macbook-frame {
+  position: relative;
+  background: linear-gradient(180deg, #2a2a2e 0%, #1a1a1e 100%);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 12px 0;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.macbook-frame::before {
+  content: '';
+  display: block;
+  height: 28px;
+  background: linear-gradient(180deg, #3a3a3e, #2a2a2e);
+  border-radius: 12px 12px 0 0;
+  margin: -12px -12px 10px;
+  position: relative;
+}
+.macbook-frame::after {
+  content: '';
+  display: block;
+  width: 8px; height: 8px;
+  background: #555;
+  border-radius: 50%;
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+}
+.macbook-dots {
+  position: absolute; top: 10px; left: 20px;
+  display: flex; gap: 6px; z-index: 1;
+}
+.macbook-dots span {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.macbook-dots span:nth-child(1) { background: #ff5f57; }
+.macbook-dots span:nth-child(2) { background: #febc2e; }
+.macbook-dots span:nth-child(3) { background: #28c840; }
 .demo-video {
-  width: 100%; border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.6);
-  border: 1px solid rgba(255,255,255,0.06);
+  width: 100%; display: block;
+  border-radius: 0;
+}
+.macbook-bottom {
+  height: 18px;
+  background: linear-gradient(180deg, #1a1a1e, #222226);
+  border-radius: 0 0 8px 8px;
+  margin: 0 40px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.macbook-chin {
+  width: 80px; height: 4px;
+  background: #333;
+  border-radius: 0 0 4px 4px;
+  margin: 0 auto;
+  position: relative; top: -2px;
 }
 
 /* Animated Notch Demo */
@@ -242,11 +291,19 @@ footer a { color: rgba(255,255,255,0.5); }
   </div>
 </section>
 
-<!-- Video Demo -->
+<!-- Video Demo in MacBook frame -->
 <section class="video-section">
-  <video autoplay loop muted playsinline class="demo-video">
-    <source src="demo.mp4" type="video/mp4">
-  </video>
+  <div class="macbook-frame">
+    <div class="macbook-dots">
+      <span></span><span></span><span></span>
+    </div>
+    <video autoplay loop muted playsinline class="demo-video">
+      <source src="demo.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="macbook-bottom">
+    <div class="macbook-chin"></div>
+  </div>
 </section>
 
 <!-- Animated Demo Section -->
