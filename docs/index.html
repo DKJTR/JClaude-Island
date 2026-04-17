@@ -320,41 +320,42 @@ footer a { color: rgba(255,255,255,0.5); }
   <div class="demo-grid">
     <!-- Left: Multi-step animated demo -->
     <div class="demo-card">
-      <div id="step-label" class="demo-label lbl-orange" style="transition:all 0.3s">1/5 — Claude is processing</div>
+      <div id="step-label" class="demo-label lbl-orange" style="transition:all 0.3s">Claude is working...</div>
 
-      <!-- Step 1: Closed notch - Claude -->
+      <!-- Step 1: Closed notch - Claude processing -->
       <div class="demo-step active" data-step="1">
-        <div class="notch-pill">
-          <span class="claude-icon">✦</span>
-          <span class="gap"></span>
-          <span class="spinner">✳</span>
+        <div class="notch-pill" style="justify-content:center;gap:12px">
+          <span class="claude-icon" style="font-size:14px">✦</span>
+          <span style="color:rgba(255,255,255,0.15);font-size:11px">━━━━━━━━━━━━━━━━━━━━━━</span>
+          <span class="spinner" style="font-size:13px">✳</span>
         </div>
       </div>
 
-      <!-- Step 2: Closed notch - Music -->
+      <!-- Step 2: Closed notch - Music takes over -->
       <div class="demo-step" data-step="2">
-        <div class="notch-pill">
-          <div class="art"></div>
-          <span class="text" style="margin-left:8px">Bethel Music — King of My Heart</span>
+        <div class="notch-pill" style="gap:8px">
+          <div class="art" style="width:22px;height:22px;border-radius:5px"></div>
+          <span class="text" style="font-size:11px">Bethel Music — King of My Heart</span>
           <span class="gap"></span>
           <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
         </div>
       </div>
 
-      <!-- Step 3: Expanded with question -->
+      <!-- Step 3: Expanded - Claude asks a question -->
       <div class="demo-step" data-step="3">
-        <div class="expanded-mock" style="font-size:12px">
-          <div class="exp-row">
-            <div class="exp-dot" style="background:#e87848"></div>
-            <div class="exp-info">
-              <div class="exp-title" style="font-size:12px">my-project</div>
-              <div class="exp-sub" style="color:#e87848">Question — Needs your input</div>
+        <div style="background:#161320;border:1px solid rgba(255,255,255,0.06);border-radius:14px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span style="color:#e87848;font-size:12px;font-weight:bold">✳</span>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:500">my-project</div>
+              <div style="font-size:10px;color:#e87848">Question</div>
             </div>
+            <span style="font-size:9px;color:rgba(255,255,255,0.3);font-family:monospace">23%(200K)</span>
           </div>
-          <div style="padding:8px 16px 12px;font-size:11px;color:rgba(255,255,255,0.7)">
+          <div style="padding:10px 14px;font-size:11px;color:rgba(255,255,255,0.7);line-height:1.5">
             Should I create separate PRs for the refactor and the new feature?
           </div>
-          <div style="display:flex;gap:6px;padding:0 16px 12px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;padding:4px 14px 12px;flex-wrap:wrap">
             <span class="q-option" id="opt1">Yes, separate PRs</span>
             <span class="q-option" id="opt2">No, bundle them</span>
             <span class="q-option" id="opt3">Let me think</span>
@@ -362,35 +363,33 @@ footer a { color: rgba(255,255,255,0.5); }
         </div>
       </div>
 
-      <!-- Step 4: Option selected -->
+      <!-- Step 4: Answer sent, Claude resumes -->
       <div class="demo-step" data-step="4">
-        <div class="expanded-mock" style="font-size:12px">
-          <div class="exp-row">
-            <div class="exp-dot" style="background:#e87848"></div>
-            <div class="exp-info">
-              <div class="exp-title" style="font-size:12px">my-project</div>
-              <div class="exp-sub">Processing...</div>
+        <div style="background:#161320;border:1px solid rgba(255,255,255,0.06);border-radius:14px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span class="spinner" style="font-size:12px">✳</span>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:500">my-project</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.35)">Processing...</div>
             </div>
           </div>
-          <div style="padding:8px 16px 12px;font-size:11px;color:#2ecc71">
+          <div style="padding:10px 14px;font-size:11px;color:#2ecc71">
             ✓ Answered: "Yes, separate PRs"
           </div>
         </div>
       </div>
 
-      <!-- Step 5: Back to closed music -->
+      <!-- Step 5: Collapses, music returns -->
       <div class="demo-step" data-step="5">
-        <div class="notch-pill">
-          <div class="art"></div>
-          <span class="text" style="margin-left:8px">Bethel Music — King of My Heart</span>
+        <div class="notch-pill" style="gap:8px">
+          <div class="art" style="width:22px;height:22px;border-radius:5px"></div>
+          <span class="text" style="font-size:11px">Bethel Music — King of My Heart</span>
           <span class="gap"></span>
           <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
         </div>
       </div>
 
-      <p class="demo-hint" id="step-hint" style="transition:opacity 0.3s">
-        Watch the full flow: processing, music, expand, answer a question, and back.
-      </p>
+      <p class="demo-hint" id="step-hint" style="transition:opacity 0.3s"></p>
     </div>
 
     <!-- Right: Expanded panel mockup -->
@@ -505,16 +504,16 @@ footer a { color: rgba(255,255,255,0.5); }
   if (!steps.length) return;
 
   const scenes = [
-    { step: 1, dur: 3000, label: '1/5 — Claude is processing',      lbl: 'lbl-orange',
-      hint: 'Claude takes the notch when actively working.' },
-    { step: 2, dur: 3000, label: '2/5 — Music plays while idle',     lbl: 'lbl-green',
-      hint: 'When Claude finishes, your music appears.' },
-    { step: 3, dur: 3500, label: '3/5 — Claude has a question',      lbl: 'lbl-cyan',
-      hint: 'Click the notch to expand. Claude asks a question with options.' },
-    { step: 4, dur: 2500, label: '4/5 — You picked an answer',       lbl: 'lbl-green',
-      hint: 'Your answer is sent. Claude continues working.' },
-    { step: 5, dur: 3000, label: '5/5 — Back to music',              lbl: 'lbl-green',
-      hint: 'The notch returns to showing your music. Loop complete.' },
+    { step: 1, dur: 3000, label: 'Claude is working...',              lbl: 'lbl-orange',
+      hint: '' },
+    { step: 2, dur: 3000, label: 'Your music takes over',             lbl: 'lbl-green',
+      hint: '' },
+    { step: 3, dur: 3500, label: 'Claude needs your input',           lbl: 'lbl-cyan',
+      hint: '' },
+    { step: 4, dur: 2500, label: 'Answered. Back to work.',           lbl: 'lbl-green',
+      hint: '' },
+    { step: 5, dur: 3000, label: 'Music is back',                     lbl: 'lbl-green',
+      hint: '' },
   ];
 
   let idx = 0;
