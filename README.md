@@ -14,6 +14,43 @@
 
 JClaude Island is a macOS notch app for the people who live in Claude Code. It puts your active sessions, the question Claude is waiting on, your music, and your AirPods battery in the one place you're always looking — the notch. No window management. No alt-tab. No checking five different surfaces.
 
+## Install
+
+**Requirements:** macOS 15.0+, Claude Code CLI, Python 3 (system Python is fine).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DKJTR/JClaude-Island/main/scripts/install.sh | bash
+```
+
+Downloads the signed DMG (SHA-256 verified), copies the app to `/Applications`, drops `claude-island-state.py` into `~/.claude/hooks/`, merges hook entries into `~/.claude/settings.json` (backs your config up first), and launches. Re-run any time to update.
+
+<details>
+<summary>Build from source</summary>
+
+```bash
+git clone https://github.com/DKJTR/JClaude-Island.git
+cd JClaude-Island
+xcodebuild -scheme ClaudeIsland -configuration Release build \
+  -destination "platform=macOS,arch=arm64" \
+  CODE_SIGN_IDENTITY="-"
+cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app /Applications/
+```
+
+Then run `scripts/install.sh` once to wire the Claude Code hooks.
+</details>
+
+<details>
+<summary>First-launch permissions</summary>
+
+| Permission | Why |
+|---|---|
+| **Bluetooth** | Read battery levels of connected devices |
+| **Apple Events** | Send messages to Claude Code in Terminal.app / iTerm2 |
+| **Accessibility** | Type messages into Cursor / VS Code / Warp / Ghostty |
+
+Skip any you don't need — the relevant features just won't fire.
+</details>
+
 ## What's new in v1.4
 
 > **AskUserQuestion in the notch — for real.** When Claude asks a question, the option chips render right in the island row. Click one and the terminal picker auto-submits. Mirror mode keeps both UIs in sync — answer in either place, the other clears.
@@ -24,7 +61,7 @@ JClaude Island is a macOS notch app for the people who live in Claude Code. It p
 
 > **One-line install.** `curl ... | bash` downloads the signed DMG, copies the app, wires the Claude Code hooks, and launches. Updates use the same line.
 
-> **Hardened.** Peer-PID socket auth. Atomic settings write. AppleScript injection-safe. Path traversal blocked. Privacy log redaction. Full review in [SECURITY notes](#security--privacy).
+> **Hardened.** Peer-PID socket auth. Atomic settings write. AppleScript injection-safe. Path traversal blocked. Privacy log redaction. Full review in [Security & privacy](#security--privacy).
 
 ## How it works
 
@@ -39,84 +76,9 @@ JClaude Island is a macOS notch app for the people who live in Claude Code. It p
 | Music playing (Claude idle) | Album art + track | 5-bar waveform |
 | BT device just paired | Device name | Green check (4s) |
 
-**Expanded notch** stacks everything in one panel:
+**Expanded notch** stacks everything in one panel — Claude rows with token bars and inline option chips, a compact Now Playing strip, and connected Bluetooth devices with battery levels. Single-click any Claude row to open chat. Pagination tops out at 5 sessions and 3 devices visible at once.
 
-- **Claude rows** — token usage bar (50%(200K) etc.), tool name when waiting for approval, **inline option chips** when waiting for an answer. Single-click to open chat.
-- **Now Playing** — Spotify or Apple Music with seekable progress, controls, album crossfade. Click the track name to open the app.
-- **Bluetooth** — connected devices with battery (AirPods L/R/Case, headphones, trackpad). Clean SF Symbol icons.
-
-Pagination keeps it tidy: max 5 Claude sessions and 3 BT devices visible at once with `< >` to page.
-
-## Features in depth
-
-### Claude Code
-- **AskUserQuestion mirror** — option chips inline in the row. Click → arrow-key keystrokes drive the terminal picker → auto-submits. Works for single-question and multi-question batches.
-- **Permission approvals** — Allow / Deny right from the notch. Hook timeout is 24 hours so it'll wait as long as you do.
-- **Multi-session** — up to 5 visible, paginate the rest. Sessions ordered by attention priority.
-- **Token usage bar** — vertical 4px gradient (green → yellow → orange → red), with `%(context-size)` label.
-- **Multi-terminal text input** — TerminalRouter detects host and routes via tmux send-keys, AppleScript (Terminal.app / iTerm2), or CGEvent (Cursor / VS Code / Warp / Ghostty).
-- **Sound alerts** — your chosen system sound plays when a new permission or question lands and the host terminal isn't visible.
-
-### Now Playing
-- Spotify and Apple Music via AppleScript (no music app launched on its own).
-- Play / pause / next / prev. Seekable progress bar. Album crossfade on track change.
-- Toggle off in settings to hide entirely.
-
-### Bluetooth
-- IOBluetooth + IOKit polling every 5s.
-- AirPods L/R/Case battery breakdown. Headphones, keyboards, trackpads.
-- Brief 4-second animation in the closed notch when something pairs.
-- Toggle off in settings to hide entirely.
-
-### Visual polish
-- 5-bar organic waveform.
-- Frosted glass blur behind the expanded panel.
-- Hover glow tint matches what's active (green = media, orange = Claude).
-- Mode-switch bounce.
-- Dynamic panel height — no wasted space.
-
-## Install
-
-**Requirements:** macOS 15.0+, Claude Code CLI, Python 3 (system Python is fine).
-
-### One-line install (recommended)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/DKJTR/JClaude-Island/main/scripts/install.sh | bash
-```
-
-What it does, in order:
-1. Looks up the latest release on GitHub
-2. Downloads the DMG (verifies SHA-256 if the release notes publish one)
-3. Mounts it, copies `JClaude Island.app` to `/Applications`, runs Gatekeeper assessment
-4. Drops `claude-island-state.py` into `~/.claude/hooks/`
-5. Merges hook entries into `~/.claude/settings.json` — backs up your existing config first, never clobbers
-6. Launches the app
-
-Re-run any time to update. Existing settings.json is preserved.
-
-### Build from source
-
-```bash
-git clone https://github.com/DKJTR/JClaude-Island.git
-cd JClaude-Island
-xcodebuild -scheme ClaudeIsland -configuration Release build \
-  -destination "platform=macOS,arch=arm64" \
-  CODE_SIGN_IDENTITY="-"
-cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app /Applications/
-```
-
-Or open `ClaudeIsland.xcodeproj` in Xcode and hit **Cmd+R**, then run `scripts/install.sh` once to wire the Claude Code hooks.
-
-### First-launch permissions
-
-| Permission | Why | Where |
-|---|---|---|
-| **Bluetooth** | Read battery levels of connected devices | System Settings → Privacy & Security → Bluetooth |
-| **Apple Events** | Send messages to Claude Code in Terminal.app / iTerm2 | First time you click "Send" — system dialog appears |
-| **Accessibility** | Type messages into Cursor / VS Code / Warp / Ghostty | First time you click "Send" to a non-AppleScript app |
-
-Skip any you don't need — the relevant features just won't fire.
+Both Now Playing and Bluetooth can be hidden from the menu if you don't want them.
 
 ## Architecture
 
