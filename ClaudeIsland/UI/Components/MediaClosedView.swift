@@ -15,7 +15,7 @@ struct MediaClosedLeftWing: View {
 
     var body: some View {
         if let np = mediaService.nowPlaying, np.hasContent {
-            HStack(spacing: 5) {
+            HStack(alignment: .center, spacing: 5) {
                 // Album art thumbnail
                 albumArt(np)
                     .frame(width: 20, height: 20)
@@ -28,6 +28,7 @@ struct MediaClosedLeftWing: View {
                     color: .white.opacity(0.85),
                     speed: 25
                 )
+                .frame(height: 20)
             }
             .padding(.leading, 6)
         }
