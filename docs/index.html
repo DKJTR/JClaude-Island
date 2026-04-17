@@ -66,6 +66,17 @@ h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 700; letter-spacing: -0.5px
   color: rgba(255,255,255,0.4); font-size: 13px;
 }
 
+/* Video Demo */
+.video-section {
+  max-width: 1000px; margin: -40px auto 0; padding: 0 40px 60px;
+  position: relative; z-index: 2;
+}
+.demo-video {
+  width: 100%; border-radius: 16px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
 /* Animated Notch Demo */
 .demo-section {
   max-width: 1200px; margin: 0 auto; padding: 60px 40px 80px;
@@ -229,6 +240,13 @@ footer a { color: rgba(255,255,255,0.5); }
     <span class="tag">AirPods Battery</span>
     <span class="tag">macOS Notch</span>
   </div>
+</section>
+
+<!-- Video Demo -->
+<section class="video-section">
+  <video autoplay loop muted playsinline class="demo-video">
+    <source src="demo.mp4" type="video/mp4">
+  </video>
 </section>
 
 <!-- Animated Demo Section -->
