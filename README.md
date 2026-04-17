@@ -1,83 +1,114 @@
 <div align="center">
-  <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Logo" width="100" height="100">
-  <h3 align="center">JClaude Island</h3>
-  <p align="center">
-    A unified macOS notch app: Claude Code + Spotify/Apple Music + Bluetooth in one Dynamic Island.
-    <br />
-    Fork of <a href="https://github.com/farouqaldori/claude-island">Claude Island</a> with media integration.
-  </p>
+  <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="JClaude Island" width="80" height="80">
+  <h1>JClaude Island</h1>
+  <p><strong>One notch to rule them all.</strong></p>
+  <p>Claude Code + Spotify + Apple Music + Bluetooth in a single macOS Dynamic Island.</p>
+  <br />
+  <img src="hero-banner.png" alt="Hero" width="600">
 </div>
 
-## What's different from Claude Island
+---
 
-JClaude Island combines Claude Code monitoring with media controls and Bluetooth device tracking, so you don't need separate notch apps (like Alcove) that fight for the same space.
+Stop juggling [Claude Island](https://github.com/farouqaldori/claude-island), [Alcove](https://tryalcove.com/), and [Vibe Island](https://vibeisland.app/). JClaude Island merges AI agent monitoring with media controls and device tracking into one notch app that gets out of your way.
 
-**Closed notch:**
-- Claude active: crab icon + processing spinner
-- Music playing (Claude idle): album art + track name + waveform animation
-- Both: Claude takes priority; expand to see both
+<div align="center">
+  <img src="feature-showcase.png" alt="Feature Showcase" width="800">
+</div>
 
-**Expanded notch:**
-- Claude session rows (stacked, with token usage bars)
-- Spotify/Apple Music compact player (album art, controls, seekable progress bar)
-- Bluetooth device list with AirPods L/R/Case battery
+## How It Works
+
+**Closed notch** adapts to what's happening:
+
+| State | Left Wing | Right Wing |
+|-------|-----------|------------|
+| Claude processing | Crab icon | Orange spinner |
+| Spotify playing | Album art + track | Waveform bars |
+| Both active | Claude takes priority | Expand to see both |
+| Nothing | Notch hides | |
+
+**Expanded notch** shows everything stacked:
+- Claude session rows with token usage bars and tool approval
+- Spotify/Apple Music compact player with seekable progress bar
 - AskUserQuestion prompts with pickable options
 
 ## Features
 
-Everything from Claude Island, plus:
+**Claude Code**
+- Multi-session monitoring with per-session token usage bars
+- Tool permission approval directly from the notch
+- AskUserQuestion prompts with clickable option buttons
+- Stale session detection (auto-idle after 30s without events)
+- Session titles sync with `/rename`
 
-- **Now Playing** -- Spotify and Apple Music track info, controls, seekable progress bar
-- **Bluetooth Devices** -- Connected devices with battery levels (AirPods L/R/Case)
-- **Stacked Layout** -- Claude sessions + media player visible simultaneously
-- **Token Usage Bar** -- Vertical gradient bar per session showing context usage
-- **AskUserQuestion UI** -- See Claude's questions and pick options from the notch
-- **Visual Polish** -- 5-bar waveform, frosted glass blur, hover glow, album art crossfade, mode-switch bounce
+**Now Playing**
+- Spotify and Apple Music via AppleScript (no private API dependency)
+- Play / pause / next / previous from the notch
+- Seekable progress bar with time labels
+- Album art with smooth crossfade on track change
 
-## Requirements
+**Bluetooth**
+- Connected device list with battery levels
+- AirPods Left / Right / Case breakdown
+- Auto-refresh every 30 seconds
 
-- macOS 15.0+
-- MacBook with notch (or external display with simulated notch)
-- Claude Code CLI
-- Spotify or Apple Music (for media features)
+**Visual Polish** (inspired by [Alcove](https://tryalcove.com/))
+- 5-bar organic waveform animation
+- Frosted glass blur behind expanded panel
+- Context-aware hover glow (green for media, orange for Claude)
+- Mode-switch bounce animation
 
 ## Install
 
-Build from source:
+**Requirements:** macOS 15.0+, Xcode, Claude Code CLI
 
 ```bash
-git clone https://github.com/DKJTR/DynamicIsland.git
-cd DynamicIsland
+git clone https://github.com/DKJTR/JClaude-Island.git
+cd JClaude-Island
 xcodebuild -scheme ClaudeIsland -configuration Release build \
   -destination "platform=macOS,arch=arm64" \
   CODE_SIGN_IDENTITY="-"
 ```
 
-Then copy the built app to `/Applications/`:
+Copy to Applications:
 
 ```bash
 cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app /Applications/
 ```
 
-Or open `ClaudeIsland.xcodeproj` in Xcode and press Cmd+R.
+Or open `ClaudeIsland.xcodeproj` in Xcode and hit **Cmd+R**.
 
-## How It Works
+Hooks auto-install on first launch. No configuration needed.
 
-Same hook system as Claude Island: installs a Python script into `~/.claude/hooks/` that communicates via Unix socket (`/tmp/dynamic-island.sock`).
+## Architecture
 
-Media integration uses AppleScript to query Spotify/Apple Music (MediaRemote private API is blocked on macOS 26 for ad-hoc signed apps).
+```
+Claude Code hooks
+    --> Python script (~/.claude/hooks/)
+    --> Unix socket (/tmp/dynamic-island.sock)
+    --> Swift app (NotchView + SessionStore + MediaRemoteService)
+    --> macOS notch overlay (NSPanel, non-activating, click-through)
+
+Spotify / Apple Music
+    --> AppleScript polling (2s interval)
+    --> NSWorkspace process check (never launches apps)
+
+Bluetooth
+    --> IOBluetooth + IOKit (30s polling)
+```
 
 ## Known Limitations
 
-- **Chrome/YouTube not supported** -- AppleScript can't query Chrome media state
-- **Token count is approximate** -- Uses JSONL-parsed input/output tokens, not the internal context window percentage
-- **No App Store distribution** -- Uses AppleScript automation (requires ad-hoc or Developer ID signing)
+- **Chrome / YouTube not supported.** AppleScript can't query Chrome media state. Only Spotify and Apple Music.
+- **Token count is approximate.** Uses JSONL-parsed input/output tokens, not the internal context window percentage from Claude Code.
+- **Ad-hoc signing only.** Uses AppleScript automation, so it can't be distributed via the Mac App Store.
+- **macOS 26 (Tahoe):** MediaRemote private API is blocked for ad-hoc signed apps. JClaude Island uses AppleScript as the primary media backend.
 
 ## Credits
 
-- [Claude Island](https://github.com/farouqaldori/claude-island) by Farouq Aldori (Apache 2.0)
-- Inspired by [Alcove](https://tryalcove.com/) and [Vibe Island](https://vibeisland.app/)
+- [Claude Island](https://github.com/farouqaldori/claude-island) by Farouq Aldori -- the foundation this is built on
+- [Alcove](https://tryalcove.com/) -- inspiration for waveform, blur, and polish
+- [Vibe Island](https://vibeisland.app/) -- inspiration for multi-agent notch UX
 
 ## License
 
-Apache 2.0 (same as upstream)
+Apache 2.0 (same as upstream Claude Island)
