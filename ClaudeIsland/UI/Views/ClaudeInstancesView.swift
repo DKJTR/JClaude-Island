@@ -75,7 +75,8 @@ struct ClaudeInstancesView: View {
                         onChat: { openChat(session) },
                         onArchive: { archiveSession(session) },
                         onApprove: { approveSession(session) },
-                        onReject: { rejectSession(session) }
+                        onReject: { rejectSession(session) },
+                        onSendInput: { text in sendInputToSession(session, text: text) }
                     )
                     .id(session.stableId)
                 }
@@ -114,6 +115,24 @@ struct ClaudeInstancesView: View {
     private func archiveSession(_ session: SessionState) {
         sessionMonitor.archiveSession(sessionId: session.sessionId)
     }
+
+    private func sendInputToSession(_ session: SessionState, text: String) {
+        Task {
+            let tmux = TmuxController.shared
+            var target: TmuxTarget?
+
+            if let pid = session.pid {
+                target = await tmux.findTmuxTarget(forClaudePid: pid)
+            }
+            if target == nil {
+                target = await tmux.findTmuxTarget(forWorkingDirectory: session.cwd)
+            }
+
+            if let target {
+                _ = await tmux.sendMessage(text, to: target)
+            }
+        }
+    }
 }
 
 // MARK: - Instance Row
@@ -125,6 +144,7 @@ struct InstanceRow: View {
     let onArchive: () -> Void
     let onApprove: () -> Void
     let onReject: () -> Void
+    var onSendInput: (String) -> Void = { _ in }
 
     @State private var isHovered = false
     @State private var spinnerPhase = 0
@@ -143,6 +163,30 @@ struct InstanceRow: View {
     private var isInteractiveTool: Bool {
         guard let toolName = session.pendingToolName else { return false }
         return toolName == "AskUserQuestion"
+    }
+
+    /// Extract the question text from AskUserQuestion toolInput
+    private var questionText: String? {
+        guard isInteractiveTool,
+              let input = session.activePermission?.toolInput,
+              let question = input["question"]?.value as? String else { return nil }
+        return question
+    }
+
+    /// Extract options from AskUserQuestion toolInput
+    private var questionOptions: [String] {
+        guard isInteractiveTool,
+              let input = session.activePermission?.toolInput else { return [] }
+
+        // Check for "options" array
+        if let options = input["options"]?.value as? [Any] {
+            return options.compactMap { item -> String? in
+                if let str = item as? String { return str }
+                if let dict = item as? [String: Any], let label = dict["label"] as? String { return label }
+                return nil
+            }
+        }
+        return []
     }
 
     /// Status text based on session phase (fallback when no other content)
@@ -184,16 +228,48 @@ struct InstanceRow: View {
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundColor(TerminalColors.amber.opacity(0.9))
                         if isInteractiveTool {
-                            Text("Needs your input")
-                                .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.5))
-                                .lineLimit(1)
+                            // Show the actual question text from toolInput
+                            if let question = questionText {
+                                Text(question)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .lineLimit(2)
+                            } else {
+                                Text("Needs your input")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .lineLimit(1)
+                            }
                         } else if let input = session.pendingToolInput {
                             Text(input)
                                 .font(.system(size: 11))
                                 .foregroundColor(.white.opacity(0.5))
                                 .lineLimit(1)
                         }
+                    }
+
+                    // Show pickable options for AskUserQuestion
+                    if isInteractiveTool && !questionOptions.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(Array(questionOptions.enumerated()), id: \.offset) { idx, option in
+                                    Button {
+                                        // Send the option number (1-indexed) to the terminal via tmux
+                                        onSendInput("\(idx + 1)")
+                                    } label: {
+                                        Text(option)
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.85))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(TerminalColors.cyan.opacity(0.2))
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .padding(.top, 2)
                     }
                 } else if let role = session.lastMessageRole {
                     switch role {
@@ -252,13 +328,11 @@ struct InstanceRow: View {
 
             // Action icons or approval buttons
             if isWaitingForApproval && isInteractiveTool {
-                // Interactive tools like AskUserQuestion - show chat + terminal buttons
+                // AskUserQuestion — show "answer in terminal" + chat
                 HStack(spacing: 8) {
                     IconButton(icon: "bubble.left") {
                         onChat()
                     }
-
-                    // Go to Terminal button (only if yabai available)
                     if isYabaiAvailable {
                         TerminalButton(
                             isEnabled: session.isInTmux,

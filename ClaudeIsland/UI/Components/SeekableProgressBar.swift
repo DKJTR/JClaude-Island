@@ -21,30 +21,33 @@ struct SeekableProgressBar: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                // Background track
-                Capsule()
+                // Background track (always tall enough to tap)
+                RoundedRectangle(cornerRadius: 3)
                     .fill(Color.white.opacity(0.08))
-                    .frame(height: isDragging ? 6 : 3)
+                    .frame(height: isDragging ? 8 : 4)
 
                 // Fill
-                Capsule()
+                RoundedRectangle(cornerRadius: 3)
                     .fill(TerminalColors.green.opacity(isDragging ? 0.9 : 0.7))
                     .frame(
                         width: max(0, geo.size.width * CGFloat(displayProgress)),
-                        height: isDragging ? 6 : 3
+                        height: isDragging ? 8 : 4
                     )
 
-                // Thumb (only when dragging)
-                if isDragging {
-                    Circle()
-                        .fill(TerminalColors.green)
-                        .frame(width: 10, height: 10)
-                        .offset(x: max(0, min(geo.size.width - 10, geo.size.width * CGFloat(dragFraction) - 5)))
-                }
+                // Thumb (always visible, larger when dragging)
+                Circle()
+                    .fill(TerminalColors.green)
+                    .frame(width: isDragging ? 14 : 8, height: isDragging ? 14 : 8)
+                    .shadow(color: TerminalColors.green.opacity(0.3), radius: isDragging ? 4 : 0)
+                    .offset(x: max(0, min(
+                        geo.size.width - (isDragging ? 14 : 8),
+                        geo.size.width * CGFloat(displayProgress) - (isDragging ? 7 : 4)
+                    )))
             }
-            .frame(height: isDragging ? 10 : 6)
+            .frame(maxHeight: .infinity)
+            // Large invisible tap area (24pt tall)
             .contentShape(Rectangle())
-            .gesture(
+            .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         isDragging = true
@@ -56,8 +59,13 @@ struct SeekableProgressBar: View {
                         isDragging = false
                     }
             )
+            // Also handle taps (single click to jump)
+            .onTapGesture { location in
+                let fraction = max(0, min(1, Double(location.x / geo.size.width)))
+                onSeek(fraction)
+            }
         }
-        .frame(height: isDragging ? 10 : 6)
+        .frame(height: 24) // 24pt hit area
         .animation(.easeOut(duration: 0.15), value: isDragging)
     }
 }

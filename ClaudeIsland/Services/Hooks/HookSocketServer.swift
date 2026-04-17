@@ -10,7 +10,7 @@ import Foundation
 import os.log
 
 /// Logger for hook socket server
-private let logger = Logger(subsystem: "com.jack.DynamicIsland", category: "Hooks")
+private let logger = Logger(subsystem: "com.jclaude.island", category: "Hooks")
 
 /// Event received from Claude Code hooks
 struct HookEvent: Codable, Sendable {

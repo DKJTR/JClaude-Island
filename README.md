@@ -1,59 +1,83 @@
 <div align="center">
   <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Logo" width="100" height="100">
-  <h3 align="center">Claude Island</h3>
+  <h3 align="center">JClaude Island</h3>
   <p align="center">
-    A macOS menu bar app that brings Dynamic Island-style notifications to Claude Code CLI sessions.
+    A unified macOS notch app: Claude Code + Spotify/Apple Music + Bluetooth in one Dynamic Island.
     <br />
-    <br />
-    <a href="https://github.com/farouqaldori/claude-island/releases/latest" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/github/v/release/farouqaldori/claude-island?style=rounded&color=white&labelColor=000000&label=release" alt="Release Version" />
-    </a>
-    <a href="#" target="_blank" rel="noopener noreferrer">
-      <img alt="GitHub Downloads" src="https://img.shields.io/github/downloads/farouqaldori/claude-island/total?style=rounded&color=white&labelColor=000000">
-    </a>
+    Fork of <a href="https://github.com/farouqaldori/claude-island">Claude Island</a> with media integration.
   </p>
 </div>
 
-> **🟢 Actively maintained**
->
-> Launched v1.2 in December 2025, then took a 4-month break. v1.3 (April 2026) works through the backlog of contributor PRs and bug reports and kicks off a regular cadence again. Open PRs and issues are being reviewed — thanks for your patience.
+## What's different from Claude Island
+
+JClaude Island combines Claude Code monitoring with media controls and Bluetooth device tracking, so you don't need separate notch apps (like Alcove) that fight for the same space.
+
+**Closed notch:**
+- Claude active: crab icon + processing spinner
+- Music playing (Claude idle): album art + track name + waveform animation
+- Both: Claude takes priority; expand to see both
+
+**Expanded notch:**
+- Claude session rows (stacked, with token usage bars)
+- Spotify/Apple Music compact player (album art, controls, seekable progress bar)
+- Bluetooth device list with AirPods L/R/Case battery
+- AskUserQuestion prompts with pickable options
 
 ## Features
 
-- **Notch UI** — Animated overlay that expands from the MacBook notch
-- **Live Session Monitoring** — Track multiple Claude Code sessions in real-time
-- **Permission Approvals** — Approve or deny tool executions directly from the notch
-- **Chat History** — View full conversation history with markdown rendering
-- **Auto-Setup** — Hooks install automatically on first launch
+Everything from Claude Island, plus:
+
+- **Now Playing** -- Spotify and Apple Music track info, controls, seekable progress bar
+- **Bluetooth Devices** -- Connected devices with battery levels (AirPods L/R/Case)
+- **Stacked Layout** -- Claude sessions + media player visible simultaneously
+- **Token Usage Bar** -- Vertical gradient bar per session showing context usage
+- **AskUserQuestion UI** -- See Claude's questions and pick options from the notch
+- **Visual Polish** -- 5-bar waveform, frosted glass blur, hover glow, album art crossfade, mode-switch bounce
 
 ## Requirements
 
-- macOS 15.6+
+- macOS 15.0+
+- MacBook with notch (or external display with simulated notch)
 - Claude Code CLI
+- Spotify or Apple Music (for media features)
 
 ## Install
 
-Download the latest release or build from source:
+Build from source:
 
 ```bash
-xcodebuild -scheme ClaudeIsland -configuration Release build
+git clone https://github.com/DKJTR/DynamicIsland.git
+cd DynamicIsland
+xcodebuild -scheme ClaudeIsland -configuration Release build \
+  -destination "platform=macOS,arch=arm64" \
+  CODE_SIGN_IDENTITY="-"
 ```
+
+Then copy the built app to `/Applications/`:
+
+```bash
+cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app /Applications/
+```
+
+Or open `ClaudeIsland.xcodeproj` in Xcode and press Cmd+R.
 
 ## How It Works
 
-Claude Island installs hooks into `~/.claude/hooks/` that communicate session state via a Unix socket. The app listens for events and displays them in the notch overlay.
+Same hook system as Claude Island: installs a Python script into `~/.claude/hooks/` that communicates via Unix socket (`/tmp/dynamic-island.sock`).
 
-When Claude needs permission to run a tool, the notch expands with approve/deny buttons—no need to switch to the terminal.
+Media integration uses AppleScript to query Spotify/Apple Music (MediaRemote private API is blocked on macOS 26 for ad-hoc signed apps).
 
-## Analytics
+## Known Limitations
 
-Claude Island uses Mixpanel to collect anonymous usage data:
+- **Chrome/YouTube not supported** -- AppleScript can't query Chrome media state
+- **Token count is approximate** -- Uses JSONL-parsed input/output tokens, not the internal context window percentage
+- **No App Store distribution** -- Uses AppleScript automation (requires ad-hoc or Developer ID signing)
 
-- **App Launched** — App version, build number, macOS version
-- **Session Started** — When a new Claude Code session is detected
+## Credits
 
-No personal data or conversation content is collected.
+- [Claude Island](https://github.com/farouqaldori/claude-island) by Farouq Aldori (Apache 2.0)
+- Inspired by [Alcove](https://tryalcove.com/) and [Vibe Island](https://vibeisland.app/)
 
 ## License
 
-Apache 2.0
+Apache 2.0 (same as upstream)

@@ -1090,15 +1090,21 @@ actor SessionStore {
                 }
             }
 
-            let needsSync: Bool
-            switch session.phase {
-            case .processing, .waitingForApproval:
-                needsSync = true
-            default:
-                needsSync = false
+            // Always sync to keep titles and status fresh
+            scheduleFileSync(sessionId: sessionId, cwd: session.cwd)
+
+            // Detect stale processing: if session has been "processing" for >30s
+            // without any hook event, transition to idle (hook was likely lost)
+            if session.phase == .processing || session.phase == .compacting {
+                let staleness = Date().timeIntervalSince(session.lastActivity)
+                if staleness > 30 {
+                    Self.logger.info("Session \(sessionId.prefix(8)) stuck in \(session.phase) for \(Int(staleness))s, transitioning to idle")
+                    sessions[sessionId]?.phase = .idle
+                }
             }
+
+            let needsSync = true
             if needsSync {
-                scheduleFileSync(sessionId: sessionId, cwd: session.cwd)
             }
         }
 
