@@ -296,9 +296,21 @@ struct InstanceRow: View {
                         onPick: { _, optionIdx in
                             // Send Down × optionIdx + Enter through TerminalRouter.
                             // Routes to tmux send-keys, AppleScript, or CGEvent
-                            // depending on host.
+                            // depending on host. Prompt for Accessibility lazily
+                            // — without it the CGEvent path silently fails and
+                            // the terminal picker just sits there waiting.
                             let s = session
                             Task {
+                                let host = await TerminalRouter.shared.detectHost(
+                                    forSessionPid: s.pid, isInTmux: s.isInTmux
+                                )
+                                if host.requiresFocus,
+                                   !KeystrokeInjector.isAccessibilityTrusted() {
+                                    _ = await MainActor.run {
+                                        KeystrokeInjector.requestAccessibility(prompt: true)
+                                    }
+                                    return  // Try again after the user grants
+                                }
                                 _ = await TerminalRouter.shared.sendOptionPick(
                                     optionIndex: optionIdx, for: s
                                 )

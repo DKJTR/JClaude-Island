@@ -9,6 +9,30 @@ import AppKit
 import Combine
 import Foundation
 
+/// Run an AppleScript via /usr/bin/osascript subprocess. Each call gets a
+/// fresh Apple Event connection — bypasses macOS error -609
+/// ("Connection is invalid") that bites in-process NSAppleScript when the
+/// target app (Spotify, Music) restarts. Returns trimmed stdout, or nil on
+/// non-zero exit. Synchronous; call off the main thread.
+fileprivate func runViaOSAScript(_ src: String) -> String? {
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    proc.arguments = ["-e", src]
+    let outPipe = Pipe()
+    proc.standardOutput = outPipe
+    proc.standardError = FileHandle.nullDevice
+    do {
+        try proc.run()
+        proc.waitUntilExit()
+        guard proc.terminationStatus == 0 else { return nil }
+        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let s = String(data: data, encoding: .utf8) ?? ""
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    } catch {
+        return nil
+    }
+}
+
 struct NowPlayingInfo: Equatable {
     var title: String = ""
     var artist: String = ""
@@ -104,8 +128,7 @@ class MediaRemoteService: ObservableObject {
         guard let app = runningMusicApp() else { return }
         let src = "tell application \"\(app.name)\" to set player position to \(position)"
         DispatchQueue.global(qos: .userInitiated).async {
-            var err: NSDictionary?
-            NSAppleScript(source: src)?.executeAndReturnError(&err)
+            _ = runViaOSAScript(src)
         }
         // Optimistic UI update
         if var info = nowPlaying {
@@ -135,8 +158,10 @@ class MediaRemoteService: ObservableObject {
         guard let app = runningMusicApp() else { return }
         let src = "tell application \"\(app.name)\" to \(command)"
         DispatchQueue.global(qos: .userInitiated).async {
-            var err: NSDictionary?
-            NSAppleScript(source: src)?.executeAndReturnError(&err)
+            // Use /usr/bin/osascript subprocess so each call gets a fresh
+            // Apple Event connection. Avoids macOS error -609 ("Connection is
+            // invalid") when Spotify/Music has restarted under us.
+            _ = runViaOSAScript(src)
         }
     }
 
@@ -175,22 +200,19 @@ class MediaRemoteService: ObservableObject {
         """
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            var err: NSDictionary?
-            let result = NSAppleScript(source: src)?.executeAndReturnError(&err)
-
-            if let err = err {
-                NSLog("[DI-Media] AppleScript error: \(err)")
-            }
+            // osascript subprocess avoids macOS error -609 caused by stale
+            // in-process Apple Event connections after Spotify/Music restart.
+            let output = runViaOSAScript(src) ?? ""
 
             Task { @MainActor in
                 guard let self else { return }
-                guard let output = result?.stringValue, !output.isEmpty else {
-                    if self.fetchCount <= 5 { NSLog("[DI-Media] AppleScript returned empty") }
+                guard !output.isEmpty else {
+                    if self.fetchCount <= 5 { NSLog("[DI-Media] osascript returned empty") }
                     self.nowPlaying = nil
                     self.isActive = false
                     return
                 }
-                if self.fetchCount <= 5 { NSLog("[DI-Media] AppleScript result: \(output.prefix(80))") }
+                if self.fetchCount <= 5 { NSLog("[DI-Media] osascript result: \(output.prefix(80))") }
 
                 let p = output.components(separatedBy: "|||")
                 guard p.count >= 6 else {
