@@ -559,13 +559,13 @@ struct ChatView: View {
     }
 
     private func sendToSession(_ text: String) async {
-        // Re-detect on each send so a session that started outside tmux but
-        // moved into it (or vice versa) routes correctly.
+        // Re-detect host silently (don't mutate detectedHost mid-send — that
+        // triggers an extra SwiftUI re-render which compounds the visible
+        // blink when Cursor steals focus to receive the keystrokes).
         let host = await TerminalRouter.shared.detectHost(
             forSessionPid: session.pid,
             isInTmux: session.isInTmux
         )
-        await MainActor.run { self.detectedHost = host }
 
         guard host.canSend else { return }
 
@@ -573,6 +573,16 @@ struct ChatView: View {
         if host.requiresFocus, !KeystrokeInjector.isAccessibilityTrusted() {
             _ = await MainActor.run { KeystrokeInjector.requestAccessibility(prompt: true) }
             return  // user has to grant; they can hit send again
+        }
+
+        // Close the notch BEFORE dispatching keystrokes — otherwise the
+        // island overlay still has focus and swallows the CGEvents. With
+        // the overlay closed, activateApp(Cursor) cleanly moves focus and
+        // the typed text lands in the terminal pane instead of the input
+        // field (which is gone anyway).
+        if host.requiresFocus {
+            await MainActor.run { viewModel.notchClose() }
+            try? await Task.sleep(for: .milliseconds(120))
         }
 
         _ = await TerminalRouter.shared.sendMessage(text, to: host)
