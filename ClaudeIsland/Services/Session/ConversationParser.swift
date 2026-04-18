@@ -167,10 +167,15 @@ actor ConversationParser {
             if json["type"] as? String == "assistant",
                let message = json["message"] as? [String: Any],
                let usageDict = message["usage"] as? [String: Any] {
-                usage.inputTokens += usageDict["input_tokens"] as? Int ?? 0
-                usage.outputTokens += usageDict["output_tokens"] as? Int ?? 0
-                usage.cacheReadTokens += usageDict["cache_read_input_tokens"] as? Int ?? 0
-                usage.cacheCreationTokens += usageDict["cache_creation_input_tokens"] as? Int ?? 0
+                // Use LAST-turn values (overwrite, don't accumulate). The token
+                // bar shows the current context window utilization, not the
+                // cumulative tokens consumed across the session — accumulating
+                // pegs the bar at 100% after a few turns even when the actual
+                // context is at 30%.
+                usage.inputTokens = usageDict["input_tokens"] as? Int ?? 0
+                usage.outputTokens = usageDict["output_tokens"] as? Int ?? 0
+                usage.cacheReadTokens = usageDict["cache_read_input_tokens"] as? Int ?? 0
+                usage.cacheCreationTokens = usageDict["cache_creation_input_tokens"] as? Int ?? 0
             }
         }
 

@@ -19,9 +19,14 @@ struct TokenUsageBar: View {
         return 200_000
     }
 
-    /// Context usage: input tokens include cache reads (what fills the context window)
+    /// Context window utilization for the latest turn.
+    /// Claude API splits the input into: input_tokens (new this turn),
+    /// cache_read_input_tokens (cached prefix re-used), and
+    /// cache_creation_input_tokens (new cache writes). All three live in the
+    /// context window. Add output_tokens to capture what's now in the window
+    /// after the response — that's what the next turn will see.
     private var contextTokens: Int {
-        inputTokens + outputTokens
+        inputTokens + cacheReadTokens + cacheCreationTokens + outputTokens
     }
 
     private var fraction: CGFloat {
