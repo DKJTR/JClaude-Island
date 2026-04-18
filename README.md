@@ -107,12 +107,28 @@ Defenses currently in place:
 - **No payload in logs** — failed-parse events log byte counts, not contents.
 - **Sandboxed AppleScript targets** — only Terminal, iTerm2, Spotify, and Apple Music can be addressed.
 
+## Accurate token bar (optional opt-in)
+
+Out of the box the token bar approximates context usage by parsing the session JSONL (last-turn `input + cache_read + cache_creation + output`). That's close but misses the system-prompt and tool-definition overhead that Claude Code factors into its internal `context_window.used_percentage`. If you want the bar to match Claude Code's number exactly, add these 6 lines to the end of your `~/.claude/statusline.sh`:
+
+```bash
+# JClaude Island — per-session token cache
+sl_session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
+if [[ -n "$sl_session_id" ]]; then
+  printf '{"size":%s,"pct":%s,"used":%s,"ts":%s}' \
+    "${ctx_size_int:-0}" "${pct_int:-0}" "${tokens_used:-0}" "$(date +%s)" \
+    > "/tmp/claude-island-tokens-${sl_session_id}.json" 2>/dev/null || true
+fi
+```
+
+The island reads `/tmp/claude-island-tokens-<sessionId>.json` if present (freshness: 5 min) and falls back to the JSONL approximation otherwise. Zero effect if you skip.
+
 ## Known limitations
 
 - Chrome / YouTube media not detected (AppleScript can't reach them).
-- Token usage is JSONL-parsed, not the model's internal context counter (close enough for the bar).
+- Token bar uses the JSONL approximation unless you opt in to the statusline snippet above.
 - Some BT devices don't report battery → shown as `N/A`.
-- v1.4.0 DMG is ad-hoc signed; Developer-ID notarization tracked for v1.5.
+- Ad-hoc signed DMG; Developer-ID notarization tracked for v1.5.
 
 ## Roadmap
 

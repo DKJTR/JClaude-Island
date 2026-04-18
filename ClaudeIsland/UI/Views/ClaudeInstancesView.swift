@@ -387,8 +387,20 @@ struct InstanceRow: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
             } else {
                 HStack(spacing: 8) {
-                    // Token usage bar
-                    if session.usage.totalTokens > 0 {
+                    // Token usage bar — prefer the per-session token cache
+                    // (authoritative; written by the user's statusline if
+                    // they opted in) and fall back to the JSONL-derived
+                    // approximation otherwise.
+                    if let snap = TokenCacheReader.snapshot(for: session.sessionId),
+                       snap.isFresh() {
+                        TokenUsageBar(
+                            inputTokens: snap.tokensUsed,
+                            outputTokens: 0,
+                            cacheReadTokens: 0,
+                            cacheCreationTokens: 0,
+                            contextLimit: snap.contextSize
+                        )
+                    } else if session.usage.totalTokens > 0 {
                         TokenUsageBar(
                             inputTokens: session.usage.inputTokens,
                             outputTokens: session.usage.outputTokens,
