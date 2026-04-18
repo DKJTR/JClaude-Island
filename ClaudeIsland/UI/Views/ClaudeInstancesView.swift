@@ -84,7 +84,13 @@ struct ClaudeInstancesView: View {
                         onArchive: { archiveSession(session) },
                         onApprove: { approveSession(session) },
                         onReject: { rejectSession(session) },
-                        onSendInput: { text in sendInputToSession(session, text: text) }
+                        onSendInput: { text in sendInputToSession(session, text: text) },
+                        onAnswerQuestion: { answers in
+                            sessionMonitor.answerQuestion(
+                                sessionId: session.sessionId,
+                                answers: answers
+                            )
+                        }
                     )
                     .id(session.stableId)
                 }
@@ -151,6 +157,7 @@ struct InstanceRow: View {
     let onApprove: () -> Void
     let onReject: () -> Void
     var onSendInput: (String) -> Void = { _ in }
+    var onAnswerQuestion: (_ answers: [String: String]) -> Void = { _ in }
 
     @State private var isHovered = false
     @State private var spinnerPhase = 0
@@ -290,31 +297,15 @@ struct InstanceRow: View {
                         .padding(.top, 2)
                     }
                 } else if isWaitingForAnswer, let ctx = inlineQuestionContext {
-                    // AskUserQuestion mirror mode — inline picker right in the row
+                    // AskUserQuestion intercept mode — picker is the only UI; pick
+                    // here and the answer is returned to Claude via the socket
+                    // (python hook outputs deny-with-answer-in-reason).
                     InlineQuestionPicker(
                         context: ctx,
-                        onPick: { _, optionIdx in
-                            // Send Down × optionIdx + Enter through TerminalRouter.
-                            // Routes to tmux send-keys, AppleScript, or CGEvent
-                            // depending on host. Prompt for Accessibility lazily
-                            // — without it the CGEvent path silently fails and
-                            // the terminal picker just sits there waiting.
-                            let s = session
-                            Task {
-                                let host = await TerminalRouter.shared.detectHost(
-                                    forSessionPid: s.pid, isInTmux: s.isInTmux
-                                )
-                                if host.requiresFocus,
-                                   !KeystrokeInjector.isAccessibilityTrusted() {
-                                    _ = await MainActor.run {
-                                        KeystrokeInjector.requestAccessibility(prompt: true)
-                                    }
-                                    return  // Try again after the user grants
-                                }
-                                _ = await TerminalRouter.shared.sendOptionPick(
-                                    optionIndex: optionIdx, for: s
-                                )
-                            }
+                        onPick: { qIdx, optionIdx in
+                            let q = ctx.questions[qIdx]
+                            let pickedLabel = q.options[optionIdx].label
+                            onAnswerQuestion([q.header: pickedLabel])
                         }
                     )
                 } else if let role = session.lastMessageRole {

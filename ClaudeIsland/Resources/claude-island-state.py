@@ -58,8 +58,8 @@ def send_event(state):
         sock.sendall(json.dumps(state).encode())
 
         # For permission requests, wait for response
-        if state.get("status") == "waiting_for_approval":
-            response = sock.recv(4096)
+        if state.get("status") in ("waiting_for_approval", "waiting_for_answer"):
+            response = sock.recv(8192)
             sock.close()
             if response:
                 return json.loads(response.decode())
@@ -114,10 +114,31 @@ def main():
             try:
                 with open("/tmp/claude-island-hook-debug.log", "a") as _f:
                     from datetime import datetime
-                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion FIRE: keys={list(tool_input.keys())} q_count={len((tool_input.get('questions') or []))}\n")
+                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion intercept: keys={list(tool_input.keys())} q_count={len((tool_input.get('questions') or []))}\n")
             except Exception:
                 pass
-            send_event(state)  # fire-and-forget — does not block
+            # INTERCEPT mode: block until user picks in island, then return the
+            # answer via permissionDecision: deny with the JSON in the reason.
+            # Mirror mode (fire-and-forget + auto-allow PermissionRequest)
+            # caused Claude Code to interpret the auto-allow as the entire
+            # response, returning empty answers. Intercept-mode bypasses that.
+            response = send_event(state)
+            if response and isinstance(response.get("answers"), dict) and response["answers"]:
+                answers = response["answers"]
+                answer_json = json.dumps(answers, ensure_ascii=False)
+                output = {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": (
+                            f"User answered via ClaudeIsland: {answer_json}. "
+                            "Treat this JSON object as the AskUserQuestion result and continue."
+                        ),
+                    }
+                }
+                print(json.dumps(output))
+                sys.exit(0)
+            # Timeout / cancel → fall through to terminal picker
             sys.exit(0)
 
         state["status"] = "running_tool"

@@ -82,11 +82,12 @@ struct HookEvent: Codable, Sendable {
         }
     }
 
-    /// Whether this event expects a response (permission request)
-    /// AskUserQuestion no longer blocks — it's fire-and-forget so the terminal
-    /// picker still renders; the island mirror submits via TerminalRouter.
+    /// Whether this event expects a response. Both PermissionRequest (Allow/Deny
+    /// for tools like Bash) AND AskUserQuestion (intercept mode — Claude waits
+    /// for the user's pick from the island) hold the socket open.
     nonisolated var expectsResponse: Bool {
-        event == "PermissionRequest" && status == "waiting_for_approval"
+        (event == "PermissionRequest" && status == "waiting_for_approval")
+        || (event == "PreToolUse" && tool == "AskUserQuestion" && status == "waiting_for_answer")
     }
 }
 
