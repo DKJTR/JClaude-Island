@@ -76,12 +76,16 @@ class NotchViewModel: ObservableObject {
                 height: 580
             )
         case .menu:
-            // Base height covers all static rows (Back, 3 picker rows, 3 toggles,
-            // Accessibility, Update, GitHub, Quit + 4 dividers + padding).
+            // Base height covers all static rows. The current menu has:
+            // Back, divider, 3 pickers (Screen / Notification Sound / Claude Dir),
+            // divider, 3 toggles (Launch at Login / Hooks / Accessibility),
+            // divider, 2 toggles (Now Playing / Bluetooth), divider, Update,
+            // Star on GitHub, Donate, divider, "Forked from..." credit, Quit.
+            // 14 rows + 5 dividers + 16pt vertical padding ≈ 660pt with some slack.
             // Picker expansion deltas added on top when expanded.
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
-                height: 540
+                height: 680
                     + screenSelector.expandedPickerHeight
                     + soundSelector.expandedPickerHeight
                     + claudeDirSelector.expandedPickerHeight

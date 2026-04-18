@@ -96,8 +96,9 @@ struct ClaudeCrabIcon: View {
 enum IslandAttentionColor {
     /// Soft lavender — permission approvals
     static let permission = Color(red: 0.60, green: 0.47, blue: 0.92)
-    /// Claude orange — AskUserQuestion answers
-    static let question = Color(red: 0.85, green: 0.47, blue: 0.34)
+    /// Bright amber — AskUserQuestion answers. Distinct from the orange crab next to
+    /// it so the indicator pops instead of blending into the body color.
+    static let question = Color(red: 1.0, green: 0.78, blue: 0.30)
 }
 
 /// How a PermissionIndicatorIcon should behave
