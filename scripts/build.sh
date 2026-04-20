@@ -83,7 +83,33 @@ if [ "$EXPORT_EXIT" -ne 0 ]; then
 fi
 
 echo ""
+
+# ============================================
+# Step: Verify & repair entitlements
+# ============================================
+# xcodebuild silently drops CODE_SIGN_ENTITLEMENTS when signing identity is "-"
+# (ad-hoc). Without the automation.apple-events entitlement, media controls
+# silently fail on macOS — no prompt, no error, just dead play/pause buttons.
+# Re-sign in place to embed them, then hard-fail if still missing.
+echo "=== Verifying entitlements ==="
+APP_PATH="$(/bin/ls -d "$EXPORT_PATH"/*.app 2>/dev/null | head -1)"
+if [ -z "$APP_PATH" ]; then
+    echo "ERROR: No .app found in $EXPORT_PATH"
+    exit 1
+fi
+ENTITLEMENTS="$PROJECT_DIR/ClaudeIsland/Resources/ClaudeIsland.entitlements"
+if ! codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null | grep -q "automation.apple-events"; then
+    echo "Entitlements missing after xcodebuild (ad-hoc bug). Re-signing with $ENTITLEMENTS..."
+    codesign -f -s - --entitlements "$ENTITLEMENTS" "$APP_PATH"
+fi
+if ! codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null | grep -q "automation.apple-events"; then
+    echo "ERROR: automation.apple-events still missing after re-sign."
+    echo "Media controls will not work. Refusing to ship this build."
+    exit 1
+fi
+echo "OK: automation.apple-events entitlement embedded."
+echo ""
 echo "=== Build Complete ==="
-echo "App exported to: $EXPORT_PATH/Claude Island.app"
+echo "App exported to: $APP_PATH"
 echo ""
 echo "Next: Run ./scripts/create-release.sh to notarize and create DMG"

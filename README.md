@@ -33,7 +33,12 @@ cd JClaude-Island
 xcodebuild -scheme ClaudeIsland -configuration Release build \
   -destination "platform=macOS,arch=arm64" \
   CODE_SIGN_IDENTITY="-"
-cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app /Applications/
+
+# xcodebuild drops entitlements when signing ad-hoc ("-"), which silently
+# breaks media controls. Re-sign the build with entitlements embedded.
+APP=$(ls -d ~/Library/Developer/Xcode/DerivedData/ClaudeIsland-*/Build/Products/Release/JClaude\ Island.app | head -1)
+codesign -f -s - --entitlements ClaudeIsland/Resources/ClaudeIsland.entitlements "$APP"
+cp -R "$APP" /Applications/
 ```
 
 Then run `scripts/install.sh` once to wire the Claude Code hooks.

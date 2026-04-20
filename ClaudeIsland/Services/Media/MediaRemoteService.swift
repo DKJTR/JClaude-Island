@@ -9,28 +9,56 @@ import AppKit
 import Combine
 import Foundation
 
+struct OSAResult {
+    let stdout: String?      // trimmed, nil on non-zero exit
+    let stderr: String       // raw stderr, for permission-error detection
+    let exitCode: Int32
+
+    /// macOS returns error -1743 (errAEEventNotPermitted) or a
+    /// "Not authorized to send Apple events" message when Automation
+    /// permission is missing or denied for the target app.
+    var permissionDenied: Bool {
+        stderr.contains("-1743")
+            || stderr.contains("-1744")
+            || stderr.localizedCaseInsensitiveContains("not authorized")
+    }
+}
+
 /// Run an AppleScript via /usr/bin/osascript subprocess. Each call gets a
 /// fresh Apple Event connection — bypasses macOS error -609
 /// ("Connection is invalid") that bites in-process NSAppleScript when the
-/// target app (Spotify, Music) restarts. Returns trimmed stdout, or nil on
-/// non-zero exit. Synchronous; call off the main thread.
-fileprivate func runViaOSAScript(_ src: String) -> String? {
+/// target app (Spotify, Music) restarts. Synchronous; call off the main thread.
+fileprivate func runOSA(_ src: String) -> OSAResult {
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
     proc.arguments = ["-e", src]
     let outPipe = Pipe()
+    let errPipe = Pipe()
     proc.standardOutput = outPipe
-    proc.standardError = FileHandle.nullDevice
+    proc.standardError = errPipe
     do {
         try proc.run()
         proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { return nil }
-        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-        let s = String(data: data, encoding: .utf8) ?? ""
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        let err = String(data: errData, encoding: .utf8) ?? ""
+        if proc.terminationStatus != 0 {
+            return OSAResult(stdout: nil, stderr: err, exitCode: proc.terminationStatus)
+        }
+        let out = String(data: outData, encoding: .utf8) ?? ""
+        return OSAResult(
+            stdout: out.trimmingCharacters(in: .whitespacesAndNewlines),
+            stderr: err,
+            exitCode: 0
+        )
     } catch {
-        return nil
+        return OSAResult(stdout: nil, stderr: "\(error)", exitCode: -1)
     }
+}
+
+/// Back-compat wrapper — returns stdout-or-nil like the previous API.
+fileprivate func runViaOSAScript(_ src: String) -> String? {
+    runOSA(src).stdout
 }
 
 struct NowPlayingInfo: Equatable {
@@ -70,13 +98,43 @@ class MediaRemoteService: ObservableObject {
 
     @Published var nowPlaying: NowPlayingInfo?
     @Published var isActive: Bool = false
+    /// True when a music app is running but osascript calls are failing with
+    /// an Automation-permission error. UI can observe this to show a "Fix
+    /// permissions" banner; we also surface a one-time NSAlert on first hit.
+    @Published var permissionBlocked: Bool = false
 
     private var pollTimer: Timer?
     private var elapsedTimer: Timer?
     private var lastArtworkUrl: String?
     private var cachedArtwork: Data?
+    private var permissionAlertShown: Bool = false
 
     private init() {}
+
+    /// Open System Settings → Privacy & Security → Automation so the user
+    /// can grant (or re-grant) the Apple Events permission.
+    func openAutomationSettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Show a one-shot alert guiding the user to Automation settings. Called
+    /// the first time we detect a permission failure in a given app launch.
+    private func showPermissionAlertOnce() {
+        guard !permissionAlertShown else { return }
+        permissionAlertShown = true
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Music controls need permission"
+            alert.informativeText = "JClaude Island can't talk to your music app. Open Automation settings and enable Spotify and Music under \"JClaude Island\"."
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Later")
+            alert.alertStyle = .warning
+            if alert.runModal() == .alertFirstButtonReturn {
+                self.openAutomationSettings()
+            }
+        }
+    }
 
     // MARK: - Lifecycle
 
@@ -155,13 +213,36 @@ class MediaRemoteService: ObservableObject {
     }
 
     private func sendCommand(_ command: String) {
-        guard let app = runningMusicApp() else { return }
+        guard let app = runningMusicApp() else {
+            NSLog("[DI-Media] sendCommand(\(command)) — no music app running")
+            return
+        }
         let src = "tell application \"\(app.name)\" to \(command)"
+        NSLog("[DI-Media] sendCommand → \(app.name): \(command)")
         DispatchQueue.global(qos: .userInitiated).async {
             // Use /usr/bin/osascript subprocess so each call gets a fresh
             // Apple Event connection. Avoids macOS error -609 ("Connection is
             // invalid") when Spotify/Music has restarted under us.
-            _ = runViaOSAScript(src)
+            let r = runOSA(src)
+            NSLog("[DI-Media] sendCommand(\(command)) exit=\(r.exitCode) stdout=\(r.stdout ?? "<nil>")")
+            Task { @MainActor [weak self] in
+                self?.handleOSA(r)
+                self?.fetchNowPlaying()
+            }
+        }
+    }
+
+    /// Inspect an osascript result for permission errors and flip state.
+    /// Called from both sendCommand and fetchNowPlaying so any path hitting
+    /// TCC trouble surfaces the same recovery affordance.
+    private func handleOSA(_ r: OSAResult) {
+        if r.permissionDenied {
+            if !permissionBlocked { NSLog("[DI-Media] permission denied: \(r.stderr)") }
+            permissionBlocked = true
+            showPermissionAlertOnce()
+        } else if r.exitCode == 0 {
+            // A successful call means permission is back (user fixed it).
+            permissionBlocked = false
         }
     }
 
@@ -202,10 +283,12 @@ class MediaRemoteService: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             // osascript subprocess avoids macOS error -609 caused by stale
             // in-process Apple Event connections after Spotify/Music restart.
-            let output = runViaOSAScript(src) ?? ""
+            let r = runOSA(src)
+            let output = r.stdout ?? ""
 
             Task { @MainActor in
                 guard let self else { return }
+                self.handleOSA(r)
                 guard !output.isEmpty else {
                     if self.fetchCount <= 5 { NSLog("[DI-Media] osascript returned empty") }
                     self.nowPlaying = nil

@@ -91,8 +91,13 @@ class NotchViewModel: ObservableObject {
                     + claudeDirSelector.expandedPickerHeight
             )
         case .instances:
-            // Dynamic height: let SwiftUI measure content, just set a generous max
-            // The actual content is wrapped in a VStack that sizes naturally
+            // This size drives isPointInOpenedPanel — the click-hit-test rect.
+            // If it underestimates the actual rendered panel, clicks below
+            // the rect are treated as "outside panel" and close the notch,
+            // which silently kills media-row buttons rendered past the cutoff.
+            // Sessions (paginated to 5), media row, bluetooth, and dividers
+            // can stack to ~800pt. Reserve enough that buttons never fall
+            // outside the hit-test area, even if it overshoots empty space.
             let hasMedia = MediaRemoteService.shared.isActive
             let mediaHeight: CGFloat = hasMedia ? 100 : 0
 
@@ -100,12 +105,15 @@ class NotchViewModel: ObservableObject {
             let btVisible = min(btCount, 3)
             let btHeight: CGFloat = btVisible > 0 ? CGFloat(36 + btVisible * 50) : 0
 
-            // Base 80 (header+padding) + estimate per-session row
-            // Sessions are paginated to max 5 visible
-            let totalHeight = 80 + mediaHeight + btHeight
+            // 5 sessions × 80pt ceiling — can't see exact count here without
+            // plumbing, so reserve worst-case so controls always clickable.
+            let sessionsHeight: CGFloat = 5 * 80
+            let dividers: CGFloat = 24
+
+            let totalHeight = 80 + sessionsHeight + mediaHeight + btHeight + dividers
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
-                height: min(max(totalHeight, 180), 600)
+                height: min(max(totalHeight, 180), 900)
             )
         case .media:
             return CGSize(

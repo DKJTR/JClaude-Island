@@ -10,7 +10,7 @@ RELEASE_DIR="$PROJECT_DIR/releases"
 KEYS_DIR="$PROJECT_DIR/.sparkle-keys"
 
 # GitHub repository (owner/repo format)
-GITHUB_REPO="farouqaldori/claude-island"
+GITHUB_REPO="DKJTR/JClaude-Island"
 
 # Website repo for auto-updating appcast
 WEBSITE_DIR="${CLAUDE_ISLAND_WEBSITE:-$PROJECT_DIR/../ClaudeIsland-website}"
@@ -23,10 +23,24 @@ KEYCHAIN_PROFILE="ClaudeIsland"
 echo "=== Creating Release ==="
 echo ""
 
-# Check if app exists
+# Check if app exists. Fall back to any .app in EXPORT_PATH since the bundle
+# name has changed historically (Claude Island.app → JClaude Island.app).
 if [ ! -d "$APP_PATH" ]; then
-    echo "ERROR: App not found at $APP_PATH"
-    echo "Run ./scripts/build.sh first"
+    FOUND_APP="$(/bin/ls -d "$EXPORT_PATH"/*.app 2>/dev/null | head -1)"
+    if [ -n "$FOUND_APP" ]; then
+        APP_PATH="$FOUND_APP"
+    else
+        echo "ERROR: App not found at $APP_PATH"
+        echo "Run ./scripts/build.sh first"
+        exit 1
+    fi
+fi
+
+# Refuse to ship a DMG from an app without the automation entitlement —
+# this is the silent-failure mode that produces dead media controls.
+if ! codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null | grep -q "automation.apple-events"; then
+    echo "ERROR: $APP_PATH is missing automation.apple-events entitlement."
+    echo "Re-run ./scripts/build.sh (it will re-sign and embed entitlements)."
     exit 1
 fi
 
