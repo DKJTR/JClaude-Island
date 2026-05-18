@@ -489,7 +489,7 @@ struct NotchView: View {
         Group {
             switch viewModel.contentType {
             case .menu:
-                NotchMenuView(viewModel: viewModel)
+                NotchMenuView(viewModel: viewModel, sessionMonitor: sessionMonitor)
             case .chat(let session):
                 ChatView(
                     sessionId: session.sessionId,

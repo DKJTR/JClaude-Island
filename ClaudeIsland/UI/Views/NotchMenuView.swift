@@ -15,6 +15,7 @@ import Sparkle
 
 struct NotchMenuView: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var sessionMonitor: ClaudeSessionMonitor
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var soundSelector = SoundSelector.shared
@@ -22,6 +23,8 @@ struct NotchMenuView: View {
     @State private var launchAtLogin: Bool = false
     @State private var showNowPlaying: Bool = AppSettings.showNowPlaying
     @State private var showBluetooth: Bool = AppSettings.showBluetooth
+    @State private var useMediaRemoteBridge: Bool = AppSettings.useMediaRemoteBridge
+    @State private var questionRouting: QuestionRouting = AppSettings.questionRouting
 
     var body: some View {
         // ScrollView so the menu gracefully scrolls when content exceeds the
@@ -84,6 +87,10 @@ struct NotchMenuView: View {
 
                 AccessibilityRow(isEnabled: AXIsProcessTrusted())
 
+                TerminalRoutingRow(sessionMonitor: sessionMonitor)
+
+                QuestionRoutingRow(selection: $questionRouting)
+
                 Divider()
                     .background(Color.white.opacity(0.08))
                     .padding(.vertical, 4)
@@ -105,6 +112,18 @@ struct NotchMenuView: View {
                 ) {
                     showBluetooth.toggle()
                     AppSettings.showBluetooth = showBluetooth
+                }
+
+                // Browser/YouTube media via MediaRemote SPI. Off by default
+                // because macOS 26 Tahoe blocks the SPI for ad-hoc-signed
+                // builds; flip on once the app is Developer-ID notarized.
+                MenuToggleRow(
+                    icon: "play.rectangle",
+                    label: "Browser Media (Notarized only)",
+                    isOn: useMediaRemoteBridge
+                ) {
+                    useMediaRemoteBridge.toggle()
+                    AppSettings.useMediaRemoteBridge = useMediaRemoteBridge
                 }
 
                 Divider()
@@ -492,6 +511,214 @@ struct AccessibilityRow: View {
     private func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+// MARK: - Question Routing Row
+
+/// 3-way segmented control deciding where interactive prompts (AskUserQuestion
+/// + PermissionRequest) are answered. See `QuestionRouting`.
+struct QuestionRoutingRow: View {
+    @Binding var selection: QuestionRouting
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "questionmark.bubble")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(isHovered ? 1.0 : 0.7))
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Questions")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(isHovered ? 1.0 : 0.7))
+
+                Text(hintText)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.45))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                ForEach(QuestionRouting.allCases, id: \.self) { mode in
+                    SegmentButton(
+                        label: mode.displayLabel,
+                        isSelected: selection == mode
+                    ) {
+                        selection = mode
+                        AppSettings.questionRouting = mode
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovered ? Color.white.opacity(0.08) : Color.clear)
+        )
+        .onHover { isHovered = $0 }
+    }
+
+    private var hintText: String {
+        switch selection {
+        case .island:   return "Answer in Island"
+        case .terminal: return "Answer in terminal"
+        case .both:     return "Answer in either"
+        }
+    }
+}
+
+private struct SegmentButton: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHover = false
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+            .foregroundColor(isSelected ? .black : .white.opacity(isHover ? 1.0 : 0.7))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(minHeight: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.white.opacity(0.95)
+                          : Color.white.opacity(isHover ? 0.14 : 0.08))
+            )
+            .contentShape(Rectangle())
+            .onHover { isHover = $0 }
+            .onTapGesture {
+                action()
+            }
+    }
+}
+
+// MARK: - Terminal Routing Row
+
+/// Shows where the active Claude session(s) will route send-to-terminal. Lets
+/// users confirm detection is working without having to trigger a hook first,
+/// and surfaces the two self-fixable failure modes: "no host detected"
+/// (usually means session exited or terminal not supported) and "needs
+/// Accessibility" (directs to the row above).
+struct TerminalRoutingRow: View {
+    @ObservedObject var sessionMonitor: ClaudeSessionMonitor
+
+    @State private var diagnostic: TerminalRouter.RoutingDiagnostic?
+    @State private var isHovered = false
+    @State private var isRefreshing = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: iconName)
+                .font(.system(size: 12))
+                .foregroundColor(iconColor)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Terminal Routing")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(isHovered ? 1.0 : 0.7))
+
+                if let hint = diagnostic?.hint {
+                    Text(hint)
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.45))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer()
+
+            rightContent
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovered ? Color.white.opacity(0.08) : Color.clear)
+        )
+        .onHover { isHovered = $0 }
+        .onAppear { refresh() }
+        .onChange(of: sessionMonitor.instances.count) { _, _ in refresh() }
+    }
+
+    @ViewBuilder
+    private var rightContent: some View {
+        if isRefreshing {
+            ProgressView()
+                .scaleEffect(0.5)
+                .frame(width: 12, height: 12)
+        } else if let d = diagnostic {
+            switch d.status {
+            case .detected:
+                HStack(spacing: 6) {
+                    Circle().fill(TerminalColors.green).frame(width: 6, height: 6)
+                    Text(d.label)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            case .noSession:
+                Text(d.label)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.35))
+            case .noHost, .needsAccessibility:
+                Button(action: refresh) {
+                    Text("Retry")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color.white)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            // Initial state before first diagnostic runs
+            ProgressView()
+                .scaleEffect(0.5)
+                .frame(width: 12, height: 12)
+        }
+    }
+
+    private var iconName: String {
+        switch diagnostic?.status {
+        case .detected: return "terminal.fill"
+        case .needsAccessibility: return "hand.raised.slash"
+        case .noHost: return "exclamationmark.triangle"
+        case .noSession, nil: return "terminal"
+        }
+    }
+
+    private var iconColor: Color {
+        switch diagnostic?.status {
+        case .detected: return TerminalColors.green
+        case .needsAccessibility: return TerminalColors.amber
+        case .noHost: return TerminalColors.amber
+        case .noSession, nil: return .white.opacity(isHovered ? 1.0 : 0.7)
+        }
+    }
+
+    private func refresh() {
+        isRefreshing = true
+        let sessions = sessionMonitor.instances.map { (pid: $0.pid, isInTmux: $0.isInTmux) }
+        Task {
+            let result = await TerminalRouter.shared.diagnoseRouting(for: sessions)
+            await MainActor.run {
+                diagnostic = result
+                isRefreshing = false
+            }
         }
     }
 }

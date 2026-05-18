@@ -18,6 +18,35 @@ actor TerminalRouter {
 
     private init() {}
 
+    // MARK: - Helper-process walk
+
+    /// Walk up the process tree starting at `startingAt`, returning the first
+    /// ancestor PID (inclusive of start) for which `lookup` returns a non-nil
+    /// value. Used to skip past helper processes like "Cursor Helper: terminal
+    /// pty-host" that match by name but have no NSRunningApplication entry.
+    ///
+    /// `parentOf` returns the ppid for a given pid, or nil to stop the walk
+    /// (end of chain, unknown pid, or init-reached). Closure-based so the walk
+    /// is unit-testable without AppKit or ProcessTreeBuilder.
+    static func resolveRunningApplicationAncestor<T>(
+        startingAt startPid: Int,
+        parentOf: (Int) -> Int?,
+        maxDepth: Int = 20,
+        lookup: (Int) -> T?
+    ) -> (pid: Int, value: T)? {
+        var current = startPid
+        var depth = 0
+        while depth < maxDepth {
+            if let value = lookup(current) {
+                return (current, value)
+            }
+            guard let parent = parentOf(current), parent > 1 else { return nil }
+            current = parent
+            depth += 1
+        }
+        return nil
+    }
+
     // MARK: - Detection
 
     /// Walk up the process tree from a Claude pid; pick the first known host we hit.
@@ -35,11 +64,48 @@ actor TerminalRouter {
 
         // 2. Walk the ancestor process chain to find the GUI terminal app
         let tree = ProcessTreeBuilder.shared.buildTree()
-        guard let hostPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree),
-              let app = NSRunningApplication(processIdentifier: pid_t(hostPid))
-        else {
+        guard let initialHostPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree) else {
             return .unknown
         }
+
+        // The name-match might land on a helper process (e.g. "Cursor Helper:
+        // terminal pty-host" in Cursor, "Code Helper (Renderer)" in VS Code).
+        // Helpers have no NSRunningApplication entry, so we keep walking up
+        // the ppid chain until we reach the real GUI app PID.
+        // First pass: find any NSRunningApplication ancestor. This may be a
+        // helper (e.g. Cursor Helper: terminal pty-host) which has no window
+        // and can't be brought to focus to receive keystrokes.
+        guard let (initialResolvedPid, initialResolvedApp) = Self.resolveRunningApplicationAncestor(
+            startingAt: initialHostPid,
+            parentOf: { tree[$0]?.ppid },
+            lookup: { NSRunningApplication(processIdentifier: pid_t($0)) }
+        ) else {
+            Self.logger.warning("detectHost: no NSRunningApplication in ancestor chain from pid \(pid, privacy: .public) (initial match was pid \(initialHostPid, privacy: .public))")
+            return .unknown
+        }
+
+        // Second pass: if we landed on a helper (bundleId ends in ".helper" or
+        // localizedName contains "Helper"), keep walking to find the parent
+        // application. Activating a helper doesn't focus its main window, so
+        // CGEvent keystrokes don't reach the terminal pane.
+        let (hostPid, app): (Int, NSRunningApplication) = {
+            let initialBundle = initialResolvedApp.bundleIdentifier ?? ""
+            let initialName = initialResolvedApp.localizedName ?? ""
+            let isHelper = initialBundle.hasSuffix(".helper")
+                || initialBundle.contains(".helper.")
+                || initialName.contains("Helper")
+            guard isHelper, let parentPid = tree[initialResolvedPid]?.ppid, parentPid > 1 else {
+                return (initialResolvedPid, initialResolvedApp)
+            }
+            if let resolved = Self.resolveRunningApplicationAncestor(
+                startingAt: parentPid,
+                parentOf: { tree[$0]?.ppid },
+                lookup: { NSRunningApplication(processIdentifier: pid_t($0)) }
+            ) {
+                return resolved
+            }
+            return (initialResolvedPid, initialResolvedApp)
+        }()
 
         let bundleId = app.bundleIdentifier ?? ""
         let appName = app.localizedName ?? "App"
@@ -57,6 +123,67 @@ actor TerminalRouter {
             }
             return .unknown
         }
+    }
+
+    // MARK: - Diagnostics
+
+    /// Snapshot of where the currently-active Claude sessions route to. Used
+    /// by the settings menu so users can see whether send-to-terminal will
+    /// work without guessing.
+    struct RoutingDiagnostic: Sendable {
+        enum Status: Sendable { case detected, noSession, noHost, needsAccessibility }
+
+        let status: Status
+        /// Human label for the right side of the menu row (e.g. "Cursor", "iTerm2", "Not detected").
+        let label: String
+        /// Optional explanatory hint under the label when things aren't right.
+        let hint: String?
+    }
+
+    /// Run host detection across the provided sessions and summarize for the UI.
+    /// `sessions` is a tuple list of (pid, isInTmux) so the caller can feed in
+    /// whatever set of live sessions the session monitor is tracking without
+    /// leaking SessionState into this layer.
+    func diagnoseRouting(for sessions: [(pid: Int?, isInTmux: Bool)]) async -> RoutingDiagnostic {
+        guard !sessions.isEmpty else {
+            return RoutingDiagnostic(status: .noSession, label: "No active session", hint: nil)
+        }
+
+        var firstHostLabel: String?
+        var sawUnknown = false
+        for s in sessions {
+            let host = await detectHost(forSessionPid: s.pid, isInTmux: s.isInTmux)
+            switch host {
+            case .unknown:
+                sawUnknown = true
+            default:
+                if firstHostLabel == nil { firstHostLabel = host.displayName }
+            }
+        }
+
+        if let label = firstHostLabel {
+            // Flag the specific case where host is resolved but AX is missing
+            // for bundleApp/terminalApp hosts that need CGEvent injection.
+            let axTrusted = await MainActor.run { AXIsProcessTrusted() }
+            if !axTrusted {
+                return RoutingDiagnostic(
+                    status: .needsAccessibility,
+                    label: label,
+                    hint: "Accessibility permission missing — grant below"
+                )
+            }
+            return RoutingDiagnostic(status: .detected, label: label, hint: nil)
+        }
+
+        if sawUnknown {
+            return RoutingDiagnostic(
+                status: .noHost,
+                label: "Not detected",
+                hint: "No known terminal in session's process ancestors"
+            )
+        }
+
+        return RoutingDiagnostic(status: .noSession, label: "No active session", hint: nil)
     }
 
     // MARK: - Sending

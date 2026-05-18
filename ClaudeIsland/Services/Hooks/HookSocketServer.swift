@@ -25,6 +25,9 @@ struct HookEvent: Codable, Sendable {
     let toolUseId: String?
     let notificationType: String?
     let message: String?
+    /// "island" | "terminal" | "both" — populated by the Python hook from the
+    /// routing setting file. Nil on older hook scripts; treat nil as "island".
+    let routingMode: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -33,10 +36,11 @@ struct HookEvent: Codable, Sendable {
         case toolUseId = "tool_use_id"
         case notificationType = "notification_type"
         case message
+        case routingMode = "routing_mode"
     }
 
     /// Create a copy with updated toolUseId
-    init(sessionId: String, cwd: String, event: String, status: String, pid: Int?, tty: String?, tool: String?, toolInput: [String: AnyCodable]?, toolUseId: String?, notificationType: String?, message: String?) {
+    init(sessionId: String, cwd: String, event: String, status: String, pid: Int?, tty: String?, tool: String?, toolInput: [String: AnyCodable]?, toolUseId: String?, notificationType: String?, message: String?, routingMode: String? = nil) {
         self.sessionId = sessionId
         self.cwd = cwd
         self.event = event
@@ -48,6 +52,7 @@ struct HookEvent: Codable, Sendable {
         self.toolUseId = toolUseId
         self.notificationType = notificationType
         self.message = message
+        self.routingMode = routingMode
     }
 
     var sessionPhase: SessionPhase {
@@ -56,18 +61,27 @@ struct HookEvent: Codable, Sendable {
         }
 
         switch status {
-        case "waiting_for_approval":
+        case "waiting_for_approval", "waiting_for_approval_mirror":
             // Note: Full PermissionContext is constructed by SessionStore, not here
             // This is just for quick phase checks
             return .waitingForApproval(PermissionContext(
                 toolUseId: toolUseId ?? "",
                 toolName: tool ?? "unknown",
                 toolInput: toolInput,
-                receivedAt: Date()
+                receivedAt: Date(),
+                routingMode: routingMode,
+                tty: tty,
+                pid: pid
             ))
-        case "waiting_for_answer":
+        case "waiting_for_answer", "waiting_for_answer_mirror":
             // Full QuestionContext is parsed by SessionStore via determinePhase()
-            if let ctx = QuestionContext.parse(toolUseId: toolUseId ?? "", toolInput: toolInput) {
+            if let ctx = QuestionContext.parse(
+                toolUseId: toolUseId ?? "",
+                toolInput: toolInput,
+                routingMode: routingMode,
+                tty: tty,
+                pid: pid
+            ) {
                 return .waitingForAnswer(ctx)
             }
             return .processing
@@ -82,9 +96,9 @@ struct HookEvent: Codable, Sendable {
         }
     }
 
-    /// Whether this event expects a response. Both PermissionRequest (Allow/Deny
-    /// for tools like Bash) AND AskUserQuestion (intercept mode — Claude waits
-    /// for the user's pick from the island) hold the socket open.
+    /// Whether this event expects a response on the socket. Mirror-mode events
+    /// (status ending in `_mirror`) are fire-and-forget — the answer flows
+    /// through the terminal picker via injected keystrokes instead.
     nonisolated var expectsResponse: Bool {
         (event == "PermissionRequest" && status == "waiting_for_approval")
         || (event == "PreToolUse" && tool == "AskUserQuestion" && status == "waiting_for_answer")
@@ -144,7 +158,11 @@ class HookSocketServer {
     }
 
     private func startServer(onEvent: @escaping HookEventHandler, onPermissionFailure: PermissionFailureHandler?) {
-        guard serverSocket < 0 else { return }
+        Self.appendAuthLog("startServer called. existing serverSocket=\(serverSocket)")
+        guard serverSocket < 0 else {
+            Self.appendAuthLog("startServer: already running (fd=\(serverSocket)) — short-circuiting")
+            return
+        }
 
         eventHandler = onEvent
         permissionFailureHandler = onPermissionFailure
@@ -153,9 +171,11 @@ class HookSocketServer {
 
         serverSocket = socket(AF_UNIX, SOCK_STREAM, 0)
         guard serverSocket >= 0 else {
+            Self.appendAuthLog("socket() failed errno=\(errno)")
             logger.error("Failed to create socket: \(errno)")
             return
         }
+        Self.appendAuthLog("socket() ok fd=\(serverSocket)")
 
         let flags = fcntl(serverSocket, F_GETFL)
         _ = fcntl(serverSocket, F_SETFL, flags | O_NONBLOCK)
@@ -177,20 +197,24 @@ class HookSocketServer {
         }
 
         guard bindResult == 0 else {
+            Self.appendAuthLog("bind() failed errno=\(errno)")
             logger.error("Failed to bind socket: \(errno)")
             close(serverSocket)
             serverSocket = -1
             return
         }
+        Self.appendAuthLog("bind() ok")
 
         chmod(Self.socketPath, 0o600)
 
         guard listen(serverSocket, 10) == 0 else {
+            Self.appendAuthLog("listen() failed errno=\(errno)")
             logger.error("Failed to listen: \(errno)")
             close(serverSocket)
             serverSocket = -1
             return
         }
+        Self.appendAuthLog("LISTENING on \(Self.socketPath)")
 
         logger.info("Listening on \(Self.socketPath, privacy: .public)")
 
@@ -410,21 +434,45 @@ class HookSocketServer {
         let tree = ProcessTreeBuilder.shared.buildTree()
         var current = pid
         var hops = 0
+        var trail: [String] = []
         while current > 1, hops < 12 {
-            guard let info = tree[current] else { break }
+            guard let info = tree[current] else {
+                Self.appendAuthLog("walk halt at pid=\(current) (not in ps tree). trail=\(trail.joined(separator: " → "))")
+                break
+            }
+            trail.append("\(current):\(info.command)")
             let lower = info.command.lowercased()
             // Match "claude" command or anything ending in /claude (script wrappers,
             // node-launched binaries, npm-installed shims).
             if lower == "claude"
                 || lower.hasSuffix("/claude")
+                || lower.hasSuffix("/claude ")
                 || lower.contains("claude-code")
+                || lower.contains(".local/bin/claude")
                 || (lower.contains("node") && lower.contains("claude")) {
+                Self.appendAuthLog("accepted pid=\(pid) hop=\(hops) match=\(info.command)")
                 return true
             }
             current = info.ppid
             hops += 1
         }
+        Self.appendAuthLog("REJECTED pid=\(pid). trail=\(trail.joined(separator: " → "))")
         return false
+    }
+
+    /// Write auth-trail diagnostics to a file (system NSLog redacts content as <private>)
+    private static func appendAuthLog(_ message: String) {
+        let path = "/tmp/claude-island-auth-debug.log"
+        let ts = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(ts)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        if let handle = FileHandle(forWritingAtPath: path) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
     }
 
     private func handleClient(_ clientSocket: Int32) {
@@ -510,7 +558,8 @@ class HookSocketServer {
                 toolInput: event.toolInput,
                 toolUseId: toolUseId,  // Use resolved toolUseId
                 notificationType: event.notificationType,
-                message: event.message
+                message: event.message,
+                routingMode: event.routingMode
             )
 
             let pending = PendingPermission(

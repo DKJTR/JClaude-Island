@@ -91,10 +91,15 @@ class ClaudeSessionMonitor: ObservableObject {
                 return
             }
 
-            HookSocketServer.shared.respondToPermission(
-                toolUseId: permission.toolUseId,
-                decision: "allow"
-            )
+            if permission.isMirrorMode {
+                // Both mode: terminal picker is still on screen. Inject "1\n".
+                await sendPermissionKeystroke(for: session, keys: "1")
+            } else {
+                HookSocketServer.shared.respondToPermission(
+                    toolUseId: permission.toolUseId,
+                    decision: "allow"
+                )
+            }
 
             await SessionStore.shared.process(
                 .permissionApproved(sessionId: sessionId, toolUseId: permission.toolUseId)
@@ -109,11 +114,18 @@ class ClaudeSessionMonitor: ObservableObject {
                 return
             }
 
-            HookSocketServer.shared.respondToPermission(
-                toolUseId: permission.toolUseId,
-                decision: "deny",
-                reason: reason
-            )
+            if permission.isMirrorMode {
+                // Both mode: send "n" + Enter to the terminal picker. Reason
+                // text isn't piped through — the user types follow-up
+                // explanation in the terminal if they want.
+                await sendPermissionKeystroke(for: session, keys: "n")
+            } else {
+                HookSocketServer.shared.respondToPermission(
+                    toolUseId: permission.toolUseId,
+                    decision: "deny",
+                    reason: reason
+                )
+            }
 
             await SessionStore.shared.process(
                 .permissionDenied(sessionId: sessionId, toolUseId: permission.toolUseId, reason: reason)
@@ -121,20 +133,79 @@ class ClaudeSessionMonitor: ObservableObject {
         }
     }
 
+    /// Inject a permission-decision keystroke ("1", "2", or "n" + Enter) into
+    /// the terminal showing Claude Code's picker. Used in `both` mode where
+    /// the terminal picker is the canonical answer channel.
+    private func sendPermissionKeystroke(for session: SessionState, keys: String) async {
+        let host = await TerminalRouter.shared.detectHost(forSessionPid: session.pid, isInTmux: session.isInTmux)
+        guard host.canSend else { return }
+        _ = await TerminalRouter.shared.sendMessage(keys, to: host)
+    }
+
     // MARK: - Question Handling (AskUserQuestion)
 
     /// Submit user-selected answers to a pending AskUserQuestion call
     /// `answers` is keyed by question header → selected option label
     func answerQuestion(sessionId: String, answers: [String: String]) {
+        Self.flow("answerQuestion entry session=\(sessionId.prefix(8)) answers=\(answers)")
         Task {
-            guard let session = await SessionStore.shared.session(for: sessionId),
-                  let ctx = session.phase.questionContext else {
+            guard let session = await SessionStore.shared.session(for: sessionId) else {
+                Self.flow("NO SESSION for \(sessionId.prefix(8))")
                 return
+            }
+            guard let ctx = session.phase.questionContext else {
+                Self.flow("phase not waitingForAnswer phase=\(session.phase)")
+                return
+            }
+            Self.flow("ctx.routingMode=\(ctx.routingMode ?? "nil") isMirrorMode=\(ctx.isMirrorMode) toolUseId=\(ctx.toolUseId.prefix(12)) pid=\(session.pid.map(String.init) ?? "nil") isInTmux=\(session.isInTmux)")
+
+            if ctx.isMirrorMode {
+                // Both mode: send the picks as arrow-key navigation into the
+                // terminal picker rather than replying on the (already-closed)
+                // socket. SessionStore is told the question was answered so
+                // the phase transitions out of waitingForAnswer.
+                let host = await TerminalRouter.shared.detectHost(
+                    forSessionPid: session.pid,
+                    isInTmux: session.isInTmux
+                )
+                Self.flow("detected host=\(host) canSend=\(host.canSend)")
+                if host.canSend {
+                    // CGEvent-based keystroke injection needs Accessibility.
+                    // Prompt lazily on the first attempt so macOS surfaces the
+                    // grant dialog (silent failures are confusing).
+                    if host.requiresFocus, !KeystrokeInjector.isAccessibilityTrusted() {
+                        Self.flow("AX not granted — requesting prompt and bailing this round")
+                        _ = await MainActor.run { KeystrokeInjector.requestAccessibility(prompt: true) }
+                        // Don't dispatch .questionAnswered yet — the terminal
+                        // picker is still waiting and the user will need to
+                        // click again after granting.
+                        return
+                    }
+                    Self.flow("AX trusted — about to sendQuestionAnswers")
+                    let ok = await TerminalRouter.shared.sendQuestionAnswers(
+                        answers,
+                        context: ctx,
+                        to: host
+                    )
+                    Self.flow("sendQuestionAnswers returned \(ok)")
+                }
             }
 
             await SessionStore.shared.process(
                 .questionAnswered(sessionId: sessionId, toolUseId: ctx.toolUseId, answers: answers)
             )
+        }
+    }
+
+    /// File-based trace for the answer flow (NSLog content is redacted by macOS).
+    private static func flow(_ s: String) {
+        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(s)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let url = URL(fileURLWithPath: "/tmp/claude-island-flow-debug.log")
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile(); try? h.write(contentsOf: data); try? h.close()
+        } else {
+            try? data.write(to: url)
         }
     }
 

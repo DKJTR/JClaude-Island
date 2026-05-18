@@ -143,16 +143,40 @@ extension HookEvent {
             return .compacting
         }
 
-        // AskUserQuestion intercepted by island → waitingForAnswer
+        // AskUserQuestion → waitingForAnswer. Status is either:
+        //   waiting_for_answer        → island mode (blocking intercept)
+        //   waiting_for_answer_mirror → both mode (terminal picker also shows)
         if event == "PreToolUse",
            tool == "AskUserQuestion",
-           status == "waiting_for_answer" {
-            if let ctx = QuestionContext.parse(toolUseId: toolUseId ?? "", toolInput: toolInput) {
-                NSLog("[DI-Question] determinePhase → .waitingForAnswer (\(ctx.questions.count) q)")
+           (status == "waiting_for_answer" || status == "waiting_for_answer_mirror") {
+            if let ctx = QuestionContext.parse(
+                toolUseId: toolUseId ?? "",
+                toolInput: toolInput,
+                routingMode: routingMode,
+                tty: tty,
+                pid: pid
+            ) {
+                NSLog("[DI-Question] determinePhase → .waitingForAnswer (\(ctx.questions.count) q, routing=\(routingMode ?? "nil"))")
                 return .waitingForAnswer(ctx)
             }
             NSLog("[DI-Question] determinePhase → .processing (parse failed)")
             return .processing
+        }
+
+        // PermissionRequest in both mode: fire-and-forget, so expectsResponse
+        // is false. We still want to surface it in the UI.
+        if event == "PermissionRequest",
+           status == "waiting_for_approval_mirror",
+           let tool = tool {
+            return .waitingForApproval(PermissionContext(
+                toolUseId: toolUseId ?? "",
+                toolName: tool,
+                toolInput: toolInput,
+                receivedAt: Date(),
+                routingMode: routingMode,
+                tty: tty,
+                pid: pid
+            ))
         }
 
         // Permission request creates waitingForApproval state
@@ -161,7 +185,10 @@ extension HookEvent {
                 toolUseId: toolUseId ?? "",
                 toolName: tool,
                 toolInput: toolInput,
-                receivedAt: Date()
+                receivedAt: Date(),
+                routingMode: routingMode,
+                tty: tty,
+                pid: pid
             ))
         }
 

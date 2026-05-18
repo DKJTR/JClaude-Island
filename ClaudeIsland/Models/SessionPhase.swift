@@ -14,6 +14,28 @@ struct PermissionContext: Sendable {
     let toolName: String
     let toolInput: [String: AnyCodable]?
     let receivedAt: Date
+    /// "island" | "terminal" | "both". Nil means legacy / unknown — treat as "island".
+    let routingMode: String?
+    /// TTY of the Claude process. Used to find the right terminal window for
+    /// keystroke injection in `both` mode.
+    let tty: String?
+    /// PID of the Claude process (parent of the hook). Used to walk the
+    /// process tree to find the GUI terminal host.
+    let pid: Int?
+
+    /// True when answering in Island should inject keystrokes into the
+    /// terminal picker rather than reply via socket. Defaults to false.
+    var isMirrorMode: Bool { routingMode == "both" }
+
+    init(toolUseId: String, toolName: String, toolInput: [String: AnyCodable]?, receivedAt: Date, routingMode: String? = nil, tty: String? = nil, pid: Int? = nil) {
+        self.toolUseId = toolUseId
+        self.toolName = toolName
+        self.toolInput = toolInput
+        self.receivedAt = receivedAt
+        self.routingMode = routingMode
+        self.tty = tty
+        self.pid = pid
+    }
 
     /// Format tool input for display
     var formattedInput: String? {
@@ -83,9 +105,28 @@ struct QuestionContext: Sendable {
     let toolUseId: String
     let questions: [PendingQuestion]
     let receivedAt: Date
+    /// "island" | "terminal" | "both". Nil = legacy hook / treat as island.
+    let routingMode: String?
+    /// TTY of the Claude process — used for keystroke injection in `both` mode.
+    let tty: String?
+    /// PID of the Claude process — used to walk to the GUI terminal host.
+    let pid: Int?
+
+    /// True when answering in Island should inject keystrokes into the
+    /// terminal picker rather than reply via socket.
+    var isMirrorMode: Bool { routingMode == "both" }
+
+    init(toolUseId: String, questions: [PendingQuestion], receivedAt: Date, routingMode: String? = nil, tty: String? = nil, pid: Int? = nil) {
+        self.toolUseId = toolUseId
+        self.questions = questions
+        self.receivedAt = receivedAt
+        self.routingMode = routingMode
+        self.tty = tty
+        self.pid = pid
+    }
 
     /// Parse from PreToolUse tool_input payload
-    nonisolated static func parse(toolUseId: String, toolInput: [String: AnyCodable]?) -> QuestionContext? {
+    nonisolated static func parse(toolUseId: String, toolInput: [String: AnyCodable]?, routingMode: String? = nil, tty: String? = nil, pid: Int? = nil) -> QuestionContext? {
         guard let input = toolInput else {
             NSLog("[DI-Question] parse: no toolInput")
             return nil
@@ -127,7 +168,14 @@ struct QuestionContext: Sendable {
             return nil
         }
         NSLog("[DI-Question] parse OK: \(parsed.count) questions")
-        return QuestionContext(toolUseId: toolUseId, questions: parsed, receivedAt: Date())
+        return QuestionContext(
+            toolUseId: toolUseId,
+            questions: parsed,
+            receivedAt: Date(),
+            routingMode: routingMode,
+            tty: tty,
+            pid: pid
+        )
     }
 }
 

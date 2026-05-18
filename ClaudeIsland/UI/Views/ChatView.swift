@@ -505,28 +505,14 @@ struct ChatView: View {
     }
 
     private func submitQuestionAnswers(_ answers: [String: String]) {
-        guard let ctx = questionContext else { return }
-        Task {
-            let host = await TerminalRouter.shared.detectHost(
-                forSessionPid: session.pid,
-                isInTmux: session.isInTmux
-            )
-            if host.canSend {
-                // CGEvent fallback requires Accessibility — prompt lazily
-                if host.requiresFocus, !KeystrokeInjector.isAccessibilityTrusted() {
-                    _ = await MainActor.run { KeystrokeInjector.requestAccessibility(prompt: true) }
-                    return
-                }
-                _ = await TerminalRouter.shared.sendQuestionAnswers(
-                    answers, context: ctx, to: host
-                )
-                // The terminal picker will submit and Claude Code's PostToolUse
-                // will clear the island's waitingForAnswer phase automatically.
-            } else {
-                // No detectable host (e.g., session ended) — clear locally
-                sessionMonitor.answerQuestion(sessionId: sessionId, answers: answers)
-            }
-        }
+        // Always dispatch through ClaudeSessionMonitor — it knows the routing
+        // mode and picks the right path:
+        //   island   → socket reply (unblocks the hook)
+        //   both     → keystroke injection into the terminal picker
+        // The previous unconditional keystroke path silently broke Island mode
+        // (no picker exists to receive the keys) and triggered the AX prompt
+        // even when AX wasn't needed.
+        sessionMonitor.answerQuestion(sessionId: sessionId, answers: answers)
     }
 
     private func cancelQuestion() {

@@ -12,6 +12,49 @@ import sys
 SOCKET_PATH = "/tmp/dynamic-island.sock"
 TIMEOUT_SECONDS = 300  # 5 minutes for permission decisions
 
+# Routing modes — written by ClaudeIsland.app (Settings.swift `writeRoutingFile`)
+ROUTING_FILE = os.path.expanduser("~/Library/Application Support/ClaudeIsland/routing.txt")
+ROUTING_ISLAND = "island"
+ROUTING_TERMINAL = "terminal"
+ROUTING_BOTH = "both"
+DEFAULT_ROUTING = ROUTING_ISLAND
+
+
+def read_routing_mode():
+    """Read current routing setting; default to island if missing/unreadable."""
+    try:
+        with open(ROUTING_FILE, "r") as f:
+            value = f.read().strip().lower()
+        if value in (ROUTING_ISLAND, ROUTING_TERMINAL, ROUTING_BOTH):
+            return value
+    except (OSError, IOError):
+        pass
+    return DEFAULT_ROUTING
+
+
+def notify_island(state, timeout=2.0):
+    """Fire-and-forget notification to the Island. Returns immediately even if
+    the app isn't listening. Used for `both` mode where the terminal picker is
+    the canonical answer channel and Island is informational.
+
+    NOTE: we deliberately keep the process alive for a short read window before
+    closing. The Swift socket server walks the peer's process tree (`ps`) for
+    auth, and if this process exits too fast the pid disappears from `ps` and
+    the connection is rejected. The recv() blocks until the server closes its
+    end (which happens after auth + handler — typically <100ms)."""
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect(SOCKET_PATH)
+        sock.sendall(json.dumps(state).encode())
+        try:
+            sock.recv(1)
+        except (socket.timeout, socket.error, OSError):
+            pass
+        sock.close()
+    except (socket.error, OSError):
+        pass
+
 
 def get_tty():
     """Get the TTY of the Claude process (parent)"""
@@ -104,24 +147,39 @@ def main():
         tool_name = data.get("tool_name")
         tool_use_id_from_event = data.get("tool_use_id")
 
-        # AskUserQuestion → mirror to ClaudeIsland (fire-and-forget).
+        # AskUserQuestion routing — three modes:
+        #   island:   block on island response; intercept terminal picker entirely
+        #   terminal: do nothing; let Claude Code render its terminal picker
+        #   both:     notify island fire-and-forget AND let terminal picker render;
+        #             Island answers will be injected as keystrokes into the picker
         if tool_name == "AskUserQuestion":
+            routing = read_routing_mode()
             state["status"] = "waiting_for_answer"
             state["tool"] = tool_name
             state["tool_input"] = tool_input
+            state["routing_mode"] = routing
             if tool_use_id_from_event:
                 state["tool_use_id"] = tool_use_id_from_event
             try:
                 with open("/tmp/claude-island-hook-debug.log", "a") as _f:
                     from datetime import datetime
-                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion intercept: keys={list(tool_input.keys())} q_count={len((tool_input.get('questions') or []))}\n")
+                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion routing={routing} keys={list(tool_input.keys())} q_count={len((tool_input.get('questions') or []))}\n")
             except Exception:
                 pass
-            # INTERCEPT mode: block until user picks in island, then return the
-            # answer via permissionDecision: deny with the JSON in the reason.
-            # Mirror mode (fire-and-forget + auto-allow PermissionRequest)
-            # caused Claude Code to interpret the auto-allow as the entire
-            # response, returning empty answers. Intercept-mode bypasses that.
+
+            if routing == ROUTING_TERMINAL:
+                # Don't bother island — terminal picker handles everything.
+                sys.exit(0)
+
+            if routing == ROUTING_BOTH:
+                # Fire-and-forget notification; mark status so the Swift socket
+                # server doesn't try to hold this connection open for a reply.
+                state["status"] = "waiting_for_answer_mirror"
+                notify_island(state)
+                sys.exit(0)
+
+            # ROUTING_ISLAND (default): blocking intercept — answer comes via
+            # permissionDecision: deny with the JSON in the reason.
             response = send_event(state)
             if response and isinstance(response.get("answers"), dict) and response["answers"]:
                 answers = response["answers"]
@@ -178,17 +236,27 @@ def main():
         tool_name = data.get("tool_name")
 
         # Special case: AskUserQuestion's PermissionRequest also fires.
-        # Auto-approve so the terminal picker renders, but DO NOT send a
-        # waiting_for_approval event to the island (the prior PreToolUse
-        # already mirrored the question with status=waiting_for_answer; this
-        # would otherwise overwrite the phase with .waitingForApproval).
+        # Behavior depends on routing mode:
+        #   island      — auto-allow so the prior PreToolUse intercept is the
+        #                 canonical answer channel (auto-allow is treated as
+        #                 the empty answer, but island already replied with
+        #                 a deny+answer JSON, so it's safe to skip the TUI)
+        #   terminal    — DO NOT auto-allow; auto-allow is interpreted by
+        #                 Claude Code as the empty answer, suppressing the
+        #                 TUI picker. Exit silently so the picker renders.
+        #   both        — DO NOT auto-allow either. The terminal picker is
+        #                 the canonical answer channel; Island is a side
+        #                 input that injects keystrokes into that picker.
         if tool_name == "AskUserQuestion":
+            routing = read_routing_mode()
             try:
                 with open("/tmp/claude-island-hook-debug.log", "a") as _f:
                     from datetime import datetime
-                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion PermissionRequest auto-allow\n")
+                    _f.write(f"[{datetime.now().isoformat(timespec='milliseconds')}] AskUserQuestion PermissionRequest routing={routing}\n")
             except Exception:
                 pass
+            if routing in (ROUTING_TERMINAL, ROUTING_BOTH):
+                sys.exit(0)
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "PermissionRequest",
@@ -199,12 +267,26 @@ def main():
             sys.exit(0)
 
         # This is where we can control the permission
+        routing = read_routing_mode()
         state["status"] = "waiting_for_approval"
         state["tool"] = tool_name
         state["tool_input"] = tool_input
+        state["routing_mode"] = routing
         # tool_use_id lookup handled by Swift-side cache from PreToolUse
 
-        # Send to app and wait for decision
+        if routing == ROUTING_TERMINAL:
+            # Don't involve Island; let Claude Code's normal permission UI show.
+            sys.exit(0)
+
+        if routing == ROUTING_BOTH:
+            # Notify Island fire-and-forget; let the terminal picker render so
+            # the user can answer in either place. If they answer in Island,
+            # the Swift app injects "1"/"2"/"n" + Enter into the terminal.
+            state["status"] = "waiting_for_approval_mirror"
+            notify_island(state)
+            sys.exit(0)
+
+        # ROUTING_ISLAND: send to app and wait for decision
         response = send_event(state)
 
         if response:

@@ -7,6 +7,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowManager: WindowManager?
     private var screenObserver: ScreenObserver?
     private var updateCheckTimer: Timer?
+    /// Eager socket-server starter; kept alive so the hook socket is up
+    /// regardless of whether the NotchView has appeared yet.
+    private var eagerSessionMonitor: ClaudeSessionMonitor?
 
     static var shared: AppDelegate?
     let updater: SPUUpdater
@@ -41,9 +44,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         HookInstaller.installIfNeeded()
+        // Seed routing.txt so the Python hook has a value to read even before
+        // the user opens the menu / changes the setting.
+        AppSettings.writeRoutingFile(AppSettings.questionRouting)
         NSApplication.shared.setActivationPolicy(.accessory)
 
-        // Start media and bluetooth monitoring early (before UI)
+        // Start the hook socket server BEFORE Bluetooth/Media services.
+        // BluetoothService.startMonitoring can synchronously trigger a TCC
+        // prompt on ad-hoc-signed dev builds, which can block the main thread
+        // until the user responds — leaving the socket unbound and every
+        // Claude Code hook seeing "Connection refused." Eager-start the
+        // monitor here so the socket is ready regardless. NotchView's onAppear
+        // also calls startMonitoring (idempotent guard prevents double-bind).
+        let monitor = ClaudeSessionMonitor()
+        monitor.startMonitoring()
+        eagerSessionMonitor = monitor
+
+        // Start media and bluetooth monitoring after the socket is up
         MediaRemoteService.shared.startMonitoring()
         BluetoothService.shared.startMonitoring()
 

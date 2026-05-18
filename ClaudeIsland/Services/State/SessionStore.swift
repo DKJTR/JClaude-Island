@@ -573,8 +573,21 @@ actor SessionStore {
     private func processQuestionAnswered(sessionId: String, toolUseId: String, answers: [String: String]) async {
         guard var session = sessions[sessionId] else { return }
 
-        // Send answers back to the python hook (it's blocking on the socket)
-        HookSocketServer.shared.respondToQuestion(toolUseId: toolUseId, answers: answers)
+        // Only reply on the socket in island (intercept) mode. In both mode,
+        // the python hook already exited and the terminal picker is driving
+        // the actual answer — `ClaudeSessionMonitor.answerQuestion` handled
+        // the keystroke injection before dispatching this event.
+        let isMirrorMode: Bool
+        if case .waitingForAnswer(let ctx) = session.phase, ctx.toolUseId == toolUseId {
+            isMirrorMode = ctx.isMirrorMode
+        } else {
+            isMirrorMode = false
+        }
+
+        NSLog("[DI-Question] processQuestionAnswered: toolUseId=\(toolUseId.prefix(12)) mirror=\(isMirrorMode) answers=\(answers.count)")
+        if !isMirrorMode {
+            HookSocketServer.shared.respondToQuestion(toolUseId: toolUseId, answers: answers)
+        }
 
         // Transition phase out of waitingForAnswer
         if case .waitingForAnswer(let ctx) = session.phase, ctx.toolUseId == toolUseId {
